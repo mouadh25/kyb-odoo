@@ -8,15 +8,93 @@ This module extends ``res.partner`` with:
        when a NIF or RC is entered.
     3. A ``_name_search`` override that queries the KYB fuzzy search endpoint
        for real-time autocomplete in many2one partner selector fields.
+    4. Resilient multi-runtime support: seamlessly uses the official ``conforme`` SDK if installed,
+       or falls back to native Python ``requests`` with zero external package requirements.
 """
 
 import logging
 from typing import Optional
 
+import requests
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+
+
+class _NativeSearchNamespace:
+    """Namespace mirroring the official SDK search capabilities."""
+
+    def __init__(self, client: "_NativeKybClient"):
+        self._client = client
+
+    def autocomplete(self, query: str, poll: bool = False) -> list:
+        res = self._client.candidates(query)
+        if isinstance(res, dict):
+            return res.get("candidates") or res.get("results") or res.get("data") or []
+        if isinstance(res, list):
+            return res
+        return []
+
+
+class _NativeKybClient:
+    """
+    Zero-dependency Native KYB HTTP Client for Odoo.
+    Uses standard Python 'requests' library bundled with all Odoo environments.
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://kyb.digidevagency.dz",
+        timeout: float = 15.0,
+        lang: str = "fr",
+    ):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.lang = lang
+        self._session = requests.Session()
+        self._session.headers.update({
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            "Accept-Language": lang,
+            "User-Agent": "Odoo-KYB-Connector/17.0 (Sovereign)",
+        })
+        self.search = _NativeSearchNamespace(self)
+
+    def resolve(self, query: str) -> dict:
+        url = f"{self.base_url}/api/v1/entity/resolve"
+        resp = self._session.get(url, params={"q": query}, timeout=self.timeout)
+        return self._handle_response(resp)
+
+    def candidates(self, query: str, limit: int = 20) -> dict:
+        url = f"{self.base_url}/api/v1/entity/candidates"
+        resp = self._session.get(
+            url, params={"q": query, "limit": limit}, timeout=self.timeout
+        )
+        return self._handle_response(resp)
+
+    def _handle_response(self, resp: requests.Response) -> dict:
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+
+        if not resp.ok:
+            # Extract localized error from universal trilingual error envelope
+            msg = (
+                data.get("message")
+                or data.get(f"message_{self.lang}")
+                or data.get("error")
+                or f"HTTP {resp.status_code} Error"
+            )
+            code = data.get("code", "API_ERROR")
+            raise UserError(f"[{code}] {msg}")
+        return data
+
+    def close(self):
+        self._session.close()
 
 
 def _get_kyb_client(env):
@@ -26,15 +104,9 @@ def _get_kyb_client(env):
     Reads credentials from Odoo system parameters:
         - ``kyb.api_key`` (or legacy ``conforme.api_key``) — Bearer token for authentication.
         - ``kyb.base_url`` (or legacy ``conforme.base_url``) — API gateway URL (default: https://kyb.digidevagency.dz).
-    """
-    try:
-        from conforme import Conforme
-    except ImportError:
-        raise UserError(
-            "The 'conforme' Python package is not installed. "
-            "Please run: pip install conforme"
-        )
 
+    Supports both the official ``conforme`` PyPI package and native ``requests``.
+    """
     ICP = env["ir.config_parameter"].sudo()
     api_key = (
         ICP.get_param("kyb.api_key", default="")
@@ -48,11 +120,21 @@ def _get_kyb_client(env):
 
     if not api_key:
         raise UserError(
-            "KYB API key is not configured. "
-            "Please navigate to Settings → Technical → System Parameters and set 'kyb.api_key'."
+            "La clé API KYB n'est pas configurée.\n\n"
+            "Veuillez vous rendre dans Paramètres → Configuration Générale → KYB Sovereign Verification "
+            "pour définir votre clé d'API (ou utiliser la clé sandbox 'sk_test_conforme_sandbox_key_001')."
         )
 
-    return Conforme(api_key=api_key, base_url=base_url, timeout=15.0)
+    user_lang = env.user.lang or "fr"
+    lang_code = "ar" if "ar" in user_lang else ("en" if "en" in user_lang else "fr")
+
+    try:
+        from conforme import Conforme
+        return Conforme(api_key=api_key, base_url=base_url, timeout=15.0)
+    except ImportError:
+        return _NativeKybClient(
+            api_key=api_key, base_url=base_url, timeout=15.0, lang=lang_code
+        )
 
 
 class ResPartner(models.Model):
@@ -159,8 +241,8 @@ class ResPartner(models.Model):
             _logger.warning("KYB resolve failed for %s: %s", query, exc)
             return {
                 "warning": {
-                    "title": "KYB Verification",
-                    "message": f"Could not verify entity '{query}': {exc}",
+                    "title": "Vérification KYB",
+                    "message": f"Impossible de certifier l'entité '{query}' : {exc}",
                 }
             }
 
@@ -202,8 +284,14 @@ class ResPartner(models.Model):
                 self.kyb_activite = activite
 
             adresse = data.get("adresse") or data.get("adresseSiegeSocial", "")
+            wilaya = data.get("wilaya", "")
             if adresse and not self.street:
                 self.street = adresse
+            elif wilaya and not self.street:
+                self.street = f"Siège Social, {wilaya}"
+
+            if wilaya and not self.city:
+                self.city = wilaya
 
             article = data.get("article_imposition") or data.get("articleImposition") or data.get("article_imp", "")
             if article:
@@ -229,10 +317,6 @@ class ResPartner(models.Model):
         """
         Override ``_name_search`` to enrich autocomplete results with KYB
         fuzzy search when standard Odoo search yields fewer than ``limit`` results.
-
-        This ensures that when a user types a company name in a many2one partner
-        field, matching companies from the KYB sovereign registry appear alongside
-        local Odoo records.
         """
         res = super()._name_search(
             name=name, domain=domain, operator=operator, limit=limit, order=order
@@ -250,7 +334,12 @@ class ResPartner(models.Model):
             return res
 
         if isinstance(matches, dict):
-            matches = matches.get("results") or matches.get("data") or []
+            matches = (
+                matches.get("candidates")
+                or matches.get("results")
+                or matches.get("data")
+                or []
+            )
 
         if not isinstance(matches, list):
             return res
@@ -282,7 +371,8 @@ class ResPartner(models.Model):
                     "kyb_rc": match.get("rcNumber") or match.get("rc") or match.get("numero_rc") or match.get("rc_number", ""),
                     "kyb_statut_cnrc": mapped_statut,
                     "kyb_activite": match.get("activite") or match.get("activitePrincipale", ""),
-                    "street": match.get("adresse") or match.get("adresseSiegeSocial", ""),
+                    "street": match.get("adresse") or match.get("adresseSiegeSocial", "") or match.get("wilaya", ""),
+                    "city": match.get("wilaya", ""),
                     "kyb_last_verified": fields.Datetime.now(),
                 })
 

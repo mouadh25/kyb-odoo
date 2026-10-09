@@ -38,10 +38,11 @@ Compatibility
     "license": "LGPL-3",
     "depends": ["base", "contacts"],
     "data": [
+        "views/res_config_settings_views.xml",
         "views/res_partner_views.xml",
     ],
     "external_dependencies": {
-        "python": ["conforme"],
+        "python": ["requests"],
     },
     "installable": True,
     "application": False,

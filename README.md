@@ -82,14 +82,20 @@ In Odoo:
 
 ## 4. Configuration
 
-Navigate to **Settings → Technical → Parameters → System Parameters** and configure the two required keys:
+You can configure your credentials in one of two ways:
+
+### Option A: Standard Settings UI (No Developer Mode Required)
+Navigate to **Settings → General Settings → KYB Sovereign Verification** and enter your API Key and Gateway URL.
+
+### Option B: System Parameters
+Navigate to **Settings → Technical → Parameters → System Parameters** and configure:
 
 | Parameter Key | Default / Recommended Value | Description |
 | :--- | :--- | :--- |
-| `kyb.api_key` | `sk_live_...` (or test key `sk_test_kyb_sandbox_key_001`) | Your KYB API Bearer token. |
+| `kyb.api_key` | `sk_live_...` (or test key `sk_test_conforme_sandbox_key_001`) | Your KYB API Bearer token. |
 | `kyb.base_url` | `https://kyb.digidevagency.dz` | Official sovereign gateway endpoint. |
 
-> **Tip:** You can test immediately using the public sandbox key `sk_test_kyb_sandbox_key_001` with zero billing charges.
+> **Tip:** You can test immediately using the public sandbox key `sk_test_conforme_sandbox_key_001` with zero billing charges.
 
 ---
 

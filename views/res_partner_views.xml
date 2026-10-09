@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ─────────────── Partner Form: KYB Tab ─────────────── -->
+    <record id="view_partner_form_kyb" model="ir.ui.view">
+        <field name="name">res.partner.form.kyb</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='internal_notes']" position="before">
+                <page string="KYB — Vérification Fiscale" name="kyb_tab">
+                    <header>
+                        <button name="action_verify_kyb"
+                                type="object"
+                                string="Vérifier Fiche KYB"
+                                class="btn-primary"
+                                icon="fa-shield"/>
+                    </header>
+                    <group>
+                        <group string="Identification Fiscale">
+                            <field name="kyb_nif"
+                                   placeholder="Ex: 000021623880453"
+                                   widget="char"/>
+                            <field name="kyb_rc"
+                                   placeholder="Ex: 16/00-1234567B89"/>
+                            <field name="kyb_article_imposition"
+                                   placeholder="Ex: 16010000001"/>
+                            <field name="kyb_nis"
+                                   placeholder="Ex: 000816097764131"/>
+                            <field name="kyb_statut_cnrc"
+                                   widget="badge"
+                                   decoration-success="kyb_statut_cnrc == 'ACTIF'"
+                                   decoration-danger="kyb_statut_cnrc == 'RADIE'"
+                                   decoration-warning="kyb_statut_cnrc == 'SUSPENDU'"
+                                   decoration-muted="kyb_statut_cnrc == 'INCONNU'"/>
+                        </group>
+                        <group string="Détails Registre">
+                            <field name="kyb_activite"/>
+                            <field name="kyb_last_verified"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ─────────────── Partner Tree: NIF Column ───────────────── -->
+    <record id="view_partner_tree_kyb" model="ir.ui.view">
+        <field name="name">res.partner.tree.kyb</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='email']" position="after">
+                <field name="kyb_nif" optional="hide"/>
+                <field name="kyb_statut_cnrc"
+                       widget="badge"
+                       decoration-success="kyb_statut_cnrc == 'ACTIF'"
+                       decoration-danger="kyb_statut_cnrc == 'RADIE'"
+                       decoration-warning="kyb_statut_cnrc == 'SUSPENDU'"
+                       optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ─────────────── Search Filter: NIF ─────────────────────── -->
+    <record id="view_partner_search_kyb" model="ir.ui.view">
+        <field name="name">res.partner.search.kyb</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="kyb_nif" string="NIF"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

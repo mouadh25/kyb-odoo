@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ─────────────── Group 1: Compliance User (Operational) ─────────────── -->
+    <record id="group_kyb_user" model="res.groups">
+        <field name="name">Compliance User</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Operational users who see KYB status badges and run verifications inside Contacts and Invoicing.</field>
+    </record>
+
+    <!-- ─────────────── Group 2: Compliance Officer / Manager (Cockpit) ─────── -->
+    <record id="group_kyb_manager" model="res.groups">
+        <field name="name">Compliance Officer / Manager</field>
+        <field name="implied_ids" eval="[(4, ref('group_kyb_user'))]"/>
+        <field name="comment">Auditors and administrators with access to the KYB Executive Cockpit, risk lists, and policy configuration.</field>
+    </record>
+
+    <!-- ─────────────── Automatically Grant to System Administrators ────────── -->
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_kyb_manager'))]"/>
+    </record>
+</odoo>

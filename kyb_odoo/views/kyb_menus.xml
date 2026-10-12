@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ─────────────── Actions for Compliance Cockpit ─────────────── -->
+    <record id="action_kyb_invoices_non_compliant" model="ir.actions.act_window">
+        <field name="name">Factures Fournisseurs Radiés (Art. 176)</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('kyb_compliance_status', '=', 'non_compliant'), ('move_type', 'in', ('in_invoice', 'in_refund'))]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Zéro facture avec fournisseur radié !
+            </p>
+            <p>
+                Toutes les factures d'achat vérifiées sont associées à des fournisseurs en activité régulière (réf. Art. 169 &amp; 176 CIDTA).
+            </p>
+        </field>
+    </record>
+
+    <record id="action_kyb_partners_radie" model="ir.actions.act_window">
+        <field name="name">Fournisseurs Radiés (CNRC)</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('kyb_statut_cnrc', '=', 'RADIE')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucun fournisseur radié détecté !
+            </p>
+            <p>
+                Toutes les entreprises vérifiées sont en activité régulière auprès du CNRC.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_kyb_trigger_eom_audit" model="ir.actions.server">
+        <field name="name">⚡ Enclencher l'Audit de Fin de Mois (G50)</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = model.action_kyb_trigger_eom_audit()
+        </field>
+    </record>
+
+    <!-- ─────────────── Root Application Menu: Restricted to Compliance Managers ─────────────── -->
+    <menuitem id="menu_kyb_root"
+              name="KYB Compliance"
+              web_icon="kyb_odoo,static/description/icon.png"
+              groups="kyb_odoo.group_kyb_manager"
+              sequence="65"/>
+
+    <!-- Child Menus inside KYB Compliance Cockpit -->
+    <menuitem id="menu_kyb_invoices_risk"
+              name="Factures à Risque Fiscal"
+              parent="menu_kyb_root"
+              action="action_kyb_invoices_non_compliant"
+              sequence="10"/>
+
+    <menuitem id="menu_kyb_partners_radie"
+              name="Fournisseurs Radiés"
+              parent="menu_kyb_root"
+              action="action_kyb_partners_radie"
+              sequence="20"/>
+
+    <menuitem id="menu_kyb_eom_audit"
+              name="⚡ Audit Fin de Mois (G50)"
+              parent="menu_kyb_root"
+              action="action_kyb_trigger_eom_audit"
+              sequence="30"/>
+
+    <menuitem id="menu_kyb_configuration"
+              name="Configuration"
+              parent="menu_kyb_root"
+              sequence="40"/>
+
+    <menuitem id="menu_kyb_settings"
+              name="Paramètres &amp; Politiques"
+              parent="menu_kyb_configuration"
+              action="action_kyb_configuration"
+              sequence="10"/>
+
+    <!-- ─────────────── Shortcuts in Invoicing & Contacts Apps ────────────────── -->
+    <menuitem id="menu_kyb_invoicing_config"
+              name="Paramètres KYB"
+              parent="account.menu_finance_configuration"
+              action="action_kyb_configuration"
+              groups="kyb_odoo.group_kyb_manager"
+              sequence="90"/>
+
+    <menuitem id="menu_kyb_contacts_config"
+              name="Paramètres KYB"
+              parent="contacts.res_partner_menu_config"
+              action="action_kyb_configuration"
+              groups="kyb_odoo.group_kyb_manager"
+              sequence="90"/>
+</odoo>

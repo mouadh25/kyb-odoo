@@ -1,42 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ─────────────── Partner Form: KYB Tab ─────────────── -->
+    <!-- ─────────────── Partner Form: KYB Integration ─────────────── -->
     <record id="view_partner_form_kyb" model="ir.ui.view">
         <field name="name">res.partner.form.kyb</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
+            <!-- Form Header Action Button -->
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_verify_kyb"
+                            type="object"
+                            string="Verify KYB"
+                            class="btn btn-primary"
+                            icon="fa-shield"/>
+                </header>
+            </xpath>
+
+            <!-- Dedicated KYB Tab -->
             <xpath expr="//page[@name='internal_notes']" position="before">
-                <page string="KYB — Vérification Fiscale" name="kyb_tab">
-                    <header>
+                <page string="KYB — Fiscal Verification" name="kyb_tab">
+                    <div class="alert alert-info d-flex justify-content-between align-items-center mb-3" role="alert">
+                        <div>
+                            <strong>KYB Verification</strong> — Vérifiez l'identité fiscale et le statut CNRC en temps réel.
+                        </div>
                         <button name="action_verify_kyb"
                                 type="object"
-                                string="Vérifier Fiche KYB"
-                                class="btn-primary"
+                                string="Verify KYB"
+                                class="btn btn-primary btn-sm"
                                 icon="fa-shield"/>
-                    </header>
+                    </div>
                     <group>
-                        <group string="Identification Fiscale">
+                        <group string="Fiscal Identification &amp; Legal Status">
                             <field name="kyb_nif"
                                    placeholder="Ex: 000021623880453"
                                    widget="char"/>
                             <field name="kyb_rc"
                                    placeholder="Ex: 16/00-1234567B89"/>
-                            <field name="kyb_article_imposition"
-                                   placeholder="Ex: 16010000001"/>
-                            <field name="kyb_nis"
-                                   placeholder="Ex: 000816097764131"/>
+                            <field name="kyb_forme_juridique"
+                                   placeholder="Ex: EURL, SARL, SPA, Personne Physique"/>
                             <field name="kyb_statut_cnrc"
                                    widget="badge"
                                    decoration-success="kyb_statut_cnrc == 'ACTIF'"
                                    decoration-danger="kyb_statut_cnrc == 'RADIE'"
                                    decoration-warning="kyb_statut_cnrc == 'SUSPENDU'"
                                    decoration-muted="kyb_statut_cnrc == 'INCONNU'"/>
+                            <field name="kyb_date_radiation" invisible="kyb_statut_cnrc != 'RADIE'"/>
+                            <field name="kyb_article_imposition"
+                                   placeholder="Ex: 16010000001"/>
+                            <field name="kyb_nis"
+                                   placeholder="Ex: 000816097764131"/>
                         </group>
-                        <group string="Détails Registre">
-                            <field name="kyb_activite"/>
+                        <group string="Registry Details &amp; Governance">
+                            <field name="kyb_representant_legal" string="Représentant Légal / Gérant"/>
+                            <field name="kyb_capital_social" string="Capital Social Déclaré"/>
+                            <field name="kyb_activite" string="Activité Principale Dominante"/>
+                            <field name="kyb_nae_codes" string="Codes NAE (Bruts)"/>
+                            <field name="kyb_activites_rc" string="Activités Secondaires RC (CNRC)"/>
                             <field name="kyb_last_verified"/>
                         </group>
                     </group>

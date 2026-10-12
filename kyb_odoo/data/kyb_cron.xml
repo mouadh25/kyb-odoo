@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- ─────────────── Scheduled Action: Monthly Fiscal Audit (G50) ─────────────── -->
+        <record id="ir_cron_kyb_eom_audit" model="ir.cron">
+            <field name="name">KYB: End-of-Month Global Fiscal Compliance Audit (G50)</field>
+            <field name="model_id" ref="account.model_account_move"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_kyb_end_of_month_audit()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">months</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

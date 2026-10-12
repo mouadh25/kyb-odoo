@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ─────────────── Invoice Form: Temporal Compliance ─────────────── -->
+    <record id="view_move_form_kyb" model="ir.ui.view">
+        <field name="name">account.move.form.kyb</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <!-- Header button to verify temporal compliance -->
+            <xpath expr="//header" position="inside">
+                <button name="action_verify_kyb_compliance"
+                        type="object"
+                        string="Audit KYB Compliance"
+                        class="btn btn-secondary"
+                        icon="fa-shield"
+                        invisible="state != 'draft'"/>
+            </xpath>
+
+            <!-- Status badge next to partner -->
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="kyb_compliance_status"
+                       widget="badge"
+                       decoration-success="kyb_compliance_status == 'compliant'"
+                       decoration-danger="kyb_compliance_status == 'non_compliant'"
+                       decoration-warning="kyb_compliance_status == 'warning'"
+                       decoration-muted="kyb_compliance_status == 'unverified'"/>
+            </xpath>
+
+            <!-- Alert banner in the form sheet for critical radiation warning -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-danger mb-2"
+                     role="alert"
+                     invisible="kyb_compliance_status != 'non_compliant'">
+                    <strong>Alerte Statut Registre KYB (Fournisseur Radié) :</strong>
+                    <field name="kyb_compliance_message" readonly="1" class="d-block mt-1"/>
+                </div>
+            </xpath>
+
+            <!-- Dedicated Permanent Tab: Audit de Statut & Conformité KYB -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Conformité &amp; Statut Registre KYB" name="kyb_audit_tab">
+                    <!-- Status Cards -->
+                    <div class="alert alert-success d-flex align-items-center mb-3"
+                         role="alert"
+                         invisible="kyb_compliance_status != 'compliant'">
+                        <div>
+                            <h5 class="mb-1 font-weight-bold text-success">✅ Fournisseur Actif au Registre (CNRC)</h5>
+                            <p class="mb-0">
+                                Le fournisseur est enregistré comme actif au registre du commerce à la date d'émission.
+                                Statut régulier au registre national du commerce (réf. Art. 169 &amp; 176 CIDTA / Art. 30 CTCA).
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger d-flex align-items-center mb-3"
+                         role="alert"
+                         invisible="kyb_compliance_status != 'non_compliant'">
+                        <div>
+                            <h5 class="mb-1 font-weight-bold text-danger">⚠️ Signalement Registre — Fournisseur Radié</h5>
+                            <p class="mb-0">
+                                <strong>Fournisseur Radié du Registre de Commerce (CNRC).</strong>
+                                Le fournisseur fait l'objet d'une radiation sur les registres officiels (réf. Art. 169 &amp; 176 CIDTA / Art. 30 CTCA). Vérification comptable préalable recommandée.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning d-flex align-items-center mb-3"
+                         role="alert"
+                         invisible="kyb_compliance_status != 'warning'">
+                        <div>
+                            <h5 class="mb-1 font-weight-bold text-warning">⚠️ Attention — Statut Registre Particulier</h5>
+                            <p class="mb-0">
+                                Fournisseur suspendu ou anomalie détectée sur le registre public. Vérification recommandée auprès de votre administration.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-secondary d-flex align-items-center mb-3"
+                         role="alert"
+                         invisible="kyb_compliance_status != 'unverified'">
+                        <div>
+                            <h5 class="mb-1 font-weight-bold text-secondary">ℹ️ Facture Non Vérifiée</h5>
+                            <p class="mb-0">
+                                Cliquez sur <strong>« Vérifier la Facture »</strong> pour consulter le statut d'activité du fournisseur à la date d'émission.
+                            </p>
+                        </div>
+                    </div>
+
+                    <group>
+                        <group string="Statut &amp; Situation Registre">
+                            <field name="kyb_compliance_status" widget="badge"
+                                   decoration-success="kyb_compliance_status == 'compliant'"
+                                   decoration-danger="kyb_compliance_status == 'non_compliant'"
+                                   decoration-warning="kyb_compliance_status == 'warning'"
+                                   decoration-muted="kyb_compliance_status == 'unverified'"/>
+                            <field name="kyb_tax_deductible" string="Fournisseur Actif" widget="boolean_toggle"/>
+                            <field name="kyb_audit_date"/>
+                            <field name="kyb_compliance_message"/>
+                        </group>
+                        <group string="Références Légales &amp; Situation Fournisseur">
+                            <field name="kyb_vendor_statut_cnrc" widget="badge"
+                                   decoration-success="kyb_vendor_statut_cnrc == 'ACTIF'"
+                                   decoration-danger="kyb_vendor_statut_cnrc == 'RADIE'"
+                                   decoration-warning="kyb_vendor_statut_cnrc == 'SUSPENDU'"/>
+                            <field name="kyb_vendor_forme_juridique"/>
+                            <field name="kyb_vendor_nif"/>
+                            <field name="kyb_vendor_rc"/>
+                            <field name="kyb_vendor_date_radiation" invisible="not kyb_vendor_date_radiation"/>
+                        </group>
+                    </group>
+
+                    <div class="mt-3">
+                        <button name="action_verify_kyb_compliance"
+                                type="object"
+                                string="Vérifier Statut Fournisseur (KYB)"
+                                class="btn btn-outline-primary"
+                                icon="fa-shield"/>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ─────────────── Invoice Tree: Status Column ───────────────────── -->
+    <record id="view_invoice_tree_kyb" model="ir.ui.view">
+        <field name="name">account.invoice.tree.kyb</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='ref']" position="after">
+                <field name="kyb_compliance_status"
+                       widget="badge"
+                       decoration-success="kyb_compliance_status == 'compliant'"
+                       decoration-danger="kyb_compliance_status == 'non_compliant'"
+                       decoration-warning="kyb_compliance_status == 'warning'"
+                       decoration-muted="kyb_compliance_status == 'unverified'"
+                       optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ─────────────── Server Action: Bulk Compliance Audit ───────────── -->
+    <record id="action_bulk_verify_kyb_compliance" model="ir.actions.server">
+        <field name="name">Audit KYB Compliance (Bulk)</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.action_verify_kyb_compliance()
+        </field>
+    </record>
+
+</odoo>

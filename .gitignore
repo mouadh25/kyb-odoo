@@ -24,35 +24,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Local Scratch / Test Scripts
-local_test.py
-*.tmp
-*.log
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
+# OS metadata
+.DS_Store
+Thumbs.db
+*.swp

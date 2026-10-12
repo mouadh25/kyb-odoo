@@ -1,0 +1,308 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* kyb_odoo
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: support@digidevagency.dz\n"
+"POT-Creation-Date: 2026-10-10 12:00+0000\n"
+"PO-Revision-Date: 2026-10-10 12:00+0000\n"
+"Last-Translator: Mouadh Benhassine\n"
+"Language-Team: Arabic\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ar\n"
+
+#. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_root
+msgid "KYB Compliance"
+msgstr "المطابقة KYB"
+
+#. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_partners
+msgid "Companies & Contacts"
+msgstr "الشركات والجهات"
+
+#. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_invoices
+msgid "Vendor Bills"
+msgstr "فواتير الموردين"
+
+#. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_configuration
+msgid "Configuration"
+msgstr "الإعدادات"
+
+#. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_settings
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_invoicing_config
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_contacts_config
+#: model:ir.actions.act_window,name:kyb_odoo.action_kyb_configuration
+msgid "KYB Settings"
+msgstr "إعدادات KYB"
+
+#. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_settings
+msgid "Settings"
+msgstr "الإعدادات"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB Verification"
+msgstr "التحقق KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB Corporate Identity & Fiscal Verification"
+msgstr "التحقق السيادي من هوية الشركات والجبايات KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB (by Digidev) Credentials"
+msgstr "بيانات اعتماد KYB (من Digidev)"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Configure your KYB secret API key (hosted locally on Algérie Télécom Cloud)."
+msgstr "تهيئة المفتاح السري لـ KYB (المستضاف محلياً بسحابة اتصالات الجزائر)."
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "CNRC Autocomplete"
+msgstr "الإكمال التلقائي من السجل التجاري"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Replaces international company search with the National Trade Registry via KYB."
+msgstr "استبدال البحث الدولي بالسجل التجاري الجزائري الوطني عبر KYB."
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Allow Worldwide Fallback Search"
+msgstr "السماح بالبحث الدولي الاحتياطي (Search Worldwide)"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Verify KYB"
+msgstr "التحقق من ملف KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "KYB — Fiscal Verification"
+msgstr "KYB — التحقق الجبائي"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "KYB Sovereign Verification"
+msgstr "التحقق السيادي KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Vérifiez l'identité fiscale et le statut CNRC en temps réel."
+msgstr "التحقق الفوري من الهوية الجبائية وحالة السجل التجاري."
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Fiscal Identification"
+msgstr "الهوية الجبائية"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Registry Details"
+msgstr "بيانات السجل التجاري"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Dominant Primary Activity"
+msgstr "النشاط الرئيسي المعتمد"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Secondary RC Activities (CNRC)"
+msgstr "الأنشطة الثانوية في السجل (CNRC)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_nif
+msgid "NIF (Numéro d'Identification Fiscale)"
+msgstr "رقم التعريف الجبائي (NIF)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_rc
+msgid "Numéro RC"
+msgstr "رقم السجل التجاري (RC)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_article_imposition
+msgid "Article d'Imposition (Numéro de Rôle)"
+msgstr "رقم المادة الضريبية"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_nis
+msgid "NIS (Numéro d'Identification Statistique)"
+msgstr "الرقم الإحصائي (NIS)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_statut_cnrc
+msgid "Statut CNRC"
+msgstr "حالة السجل التجاري"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__res_partner__kyb_statut_cnrc__actif
+msgid "Actif"
+msgstr "نشط"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__res_partner__kyb_statut_cnrc__radie
+msgid "Radié"
+msgstr "مشطب"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__res_partner__kyb_statut_cnrc__suspendu
+msgid "Suspendu"
+msgstr "معلق"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__res_partner__kyb_statut_cnrc__inconnu
+msgid "Inconnu"
+msgstr "غير محقق"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_date_radiation
+msgid "Date de Radiation"
+msgstr "تاريخ الشطب"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_activite
+msgid "Activité Principale Dominante"
+msgstr "النشاط الرئيسي المعتمد"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_activites_rc
+msgid "Activités Secondaires RC (CNRC)"
+msgstr "الأنشطة الثانوية في السجل (CNRC)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_last_verified
+msgid "Dernière vérification KYB"
+msgstr "آخر تحقق"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_move_form_kyb
+msgid "Audit KYB Compliance"
+msgstr "تدقيق مطابقة KYB"
+
+#. module: kyb_odoo
+#: model:ir.actions.server,name:kyb_odoo.action_bulk_verify_kyb_compliance
+msgid "Audit KYB Compliance (Bulk)"
+msgstr "تدقيق مطابقة KYB (جماعي)"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_move_form_kyb
+msgid "KYB Fiscal Alert: Deduction Rejection Risk"
+msgstr "تنبيه جبائي KYB: خطر رفض استرجاع الرسم والخصم"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_account_move__kyb_compliance_status
+msgid "Conformité Fiscale KYB"
+msgstr "مطابقة KYB الضريبية"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__compliant
+msgid "Conforme (Actif)"
+msgstr "مطابق (نشط)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__non_compliant
+msgid "Non Conforme (Fournisseur Radié)"
+msgstr "غير مطابق (مورد مشطب)"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__warning
+msgid "Attention / Risque"
+msgstr "تنبيه / خطر"
+
+#. module: kyb_odoo
+#: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__unverified
+msgid "Non Vérifié"
+msgstr "غير محقق"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_account_move__kyb_compliance_message
+msgid "Audit Temporel KYB"
+msgstr "التدقيق الزمني KYB"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/res_partner.py:0
+#, python-format
+msgid "La clé API KYB n'est pas configurée.\n\nVeuillez vous rendre dans Paramètres → Conforme KYB pour définir votre clé d'API (ou utiliser la clé sandbox 'sk_test_kyb_sandbox_key_001')."
+msgstr "مفتاح API الخاص بـ KYB غير مهيأ.\n\nيرجى الانتقال إلى الإعدادات ← المطابقة KYB لضبط مفتاح API الخاص بك (أو استخدام مفتاح بيئة الاختبار المجاني 'sk_test_kyb_sandbox_key_001')."
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/res_partner.py:0
+#, python-format
+msgid "Veuillez renseigner un NIF, un RC ou une Raison Sociale pour lancer la vérification."
+msgstr "يرجى إدخال رقم التعريف الجبائي (NIF) أو السجل التجاري (RC) أو اسم الشركة لبدء عملية التحقق."
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/res_partner.py:0
+#, python-format
+msgid "Vérification KYB Réussie"
+msgstr "تم التحقق من KYB بنجاح"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/res_partner.py:0
+#, python-format
+msgid "L'entité '%(name)s' a été vérifiée avec succès (Statut: %(statut)s)."
+msgstr "تمت مطابقة وتوثيق المؤسسة '%(name)s' بنجاح (الحالة: %(statut)s)."
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/res_partner.py:0
+#, python-format
+msgid "Vérification KYB"
+msgstr "التحقق KYB"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/res_partner.py:0
+#, python-format
+msgid "Impossible de vérifier l'entité '%(query)s' : %(error)s"
+msgstr "تعذر توثيق المؤسسة '%(query)s': %(error)s"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/account_move.py:0
+#, python-format
+msgid "Veuillez sélectionner un partenaire avant de vérifier la conformité fiscale."
+msgstr "يرجى تحديد الشريك أو المورد قبل إجراء تدقيق المطابقة الضريبية."
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/account_move.py:0
+#, python-format
+msgid "Audit Temporel KYB"
+msgstr "التدقيق الزمني KYB"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/account_move.py:0
+#, python-format
+msgid "Verdict pour '%(partner)s' : %(status)s"
+msgstr "نتيجة الفحص لـ '%(partner)s': %(status)s"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/account_move.py:0
+#, python-format
+msgid ""
+"Audit en masse terminé (%(total)d factures auditées) :\n"
+"• %(compliant)d Conforme(s) (Actifs)\n"
+"• %(non_compliant)d Non Conforme(s) (Fournisseurs Radiés - Risque fiscal)\n"
+"• %(warning)d Suspect(s) / Avertissement(s)"
+msgstr ""
+"اكتمل التدقيق الجماعي (%(total)d فاتورة تم فحصها):\n"
+"• %(compliant)d مطابق (نشط)\n"
+"• %(non_compliant)d غير مطابق (مورد مشطب - خطر ضريبي)\n"
+"• %(warning)d تنبيه أو قيد المراجعة"
+
+#. module: kyb_odoo
+#: code:addons/kyb_odoo/models/account_move.py:0
+#, python-format
+msgid "Audit de Masse KYB Terminé"
+msgstr "اكتمل التدقيق الجماعي KYB"

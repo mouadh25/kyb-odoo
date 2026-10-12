@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_kyb" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.kyb</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="99"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="KYB Compliance" string="KYB Compliance" name="kyb_odoo" logo="/kyb_odoo/static/description/icon.png">
+                    <block title="KYB Corporate Identity &amp; Fiscal Verification" id="kyb_settings_block">
+                        <setting string="KYB (by Digidev) Credentials" help="Configure your KYB secret API key (hosted locally on Algérie Télécom Cloud).">
+                            <div class="content-group">
+                                <div class="row mt4">
+                                    <label for="kyb_api_key" class="col-lg-3 o_light_label" string="API Key"/>
+                                    <field name="kyb_api_key" password="True" placeholder="sk_live_... ou sk_test_kyb_sandbox_key_001"/>
+                                </div>
+                                <div class="row mt4">
+                                    <label for="kyb_base_url" class="col-lg-3 o_light_label" string="Gateway URL"/>
+                                    <field name="kyb_base_url" placeholder="https://kyb.digidevagency.dz"/>
+                                </div>
+                            </div>
+                        </setting>
+                        <setting string="CNRC Autocomplete" help="Replaces international company search with the National Trade Registry via KYB.">
+                            <field name="kyb_sovereign_autocomplete"/>
+                            <div class="content-group" invisible="not kyb_sovereign_autocomplete">
+                                <div class="mt8">
+                                    <field name="kyb_allow_worldwide_fallback" class="oe_inline"/>
+                                    <label for="kyb_allow_worldwide_fallback" string="Allow Worldwide Fallback Search" class="oe_inline"/>
+                                </div>
+                            </div>
+                        </setting>
+
+                        <setting string="Détection des Doublons Fiscaux (NIF)" help="Avertit ou bloque lors de la saisie d'un NIF déjà existant sur une autre fiche contact.">
+                            <field name="kyb_duplicate_nif_policy"/>
+                        </setting>
+
+                        <setting string="Temporal Invoice Compliance &amp; Blocking Policy" help="Enforce CIDTA Art. 169 &amp; 176 and CTCA Art. 30 rules on vendor bills.">
+                            <field name="kyb_invoice_audit_enabled"/>
+                            <div class="content-group" invisible="not kyb_invoice_audit_enabled">
+                                <div class="row mt4">
+                                    <label for="kyb_invoice_blocking_policy" class="col-lg-4 o_light_label" string="Action on Deregistered Supplier"/>
+                                    <field name="kyb_invoice_blocking_policy"/>
+                                </div>
+                                <div class="row mt4">
+                                    <label for="kyb_unverified_partner_policy" class="col-lg-4 o_light_label" string="Action on Unverified Supplier"/>
+                                    <field name="kyb_unverified_partner_policy"/>
+                                </div>
+                            </div>
+                        </setting>
+
+                        <setting string="End-of-Month Global Audit (G50 Safety Net)" help="Automatically audit all current month vendor bills before statutory tax filing.">
+                            <field name="kyb_eom_auto_audit"/>
+                            <div class="content-group" invisible="not kyb_eom_auto_audit">
+                                <div class="row mt4">
+                                    <label for="kyb_eom_audit_day" class="col-lg-4 o_light_label" string="Execution Day of Month"/>
+                                    <field name="kyb_eom_audit_day"/>
+                                </div>
+                            </div>
+                        </setting>
+
+                        <!-- Sovereign Legal Framework callout cleanly located in Settings -->
+                        <div class="alert alert-secondary mt-3 p-3 rounded" role="status">
+                            <div class="d-flex align-items-center">
+                                <i class="fa fa-university fa-2x text-primary me-3"/>
+                                <div>
+                                    <strong class="d-block mb-1">Cadre Réglementaire, Secret Fiscal &amp; Sécurité Souveraine</strong>
+                                    <p class="mb-0 text-muted small">
+                                        • <strong>Loi 18-07 / 25-11 :</strong> Hébergement 100% souverain sur le Cloud Algérie Télécom (aucune fuite de données à l'étranger).<br/>
+                                        • <strong>Articles 169 &amp; 176 du CIDTA &amp; Art. 30 du CTCA :</strong> Contrôle réglementaire de l'état d'activité des fournisseurs au registre du commerce avant comptabilisation des factures d'achat.<br/>
+                                        • <strong>Article 114 du CPF (Secret Fiscal) :</strong> L'Article d'Imposition (Numéro de Rôle) relève du secret fiscal et n'est pas divulgué dans les registres publics CNRC. Il doit être renseigné manuellement sur la fiche contact à réception de la première facture commerciale (Décret 05-468).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_kyb_configuration" model="ir.actions.act_window">
+        <field name="name">KYB Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module' : 'kyb_odoo'}</field>
+    </record>
+</odoo>

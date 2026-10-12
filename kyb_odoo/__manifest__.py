@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "KYB — Algerian Corporate Identity & Temporal Fiscal Compliance",
-    "version": "20.0.1.4.2",
+    "version": "16.0.1.4.2",
     "category": "Accounting/Localisation",
     "summary": "Instant NIF/RC verification (<10ms), temporal strike-off audit (CIDTA Art. 176), and auto-completion for Algerian counterparties.",
     "description": """
@@ -51,6 +51,12 @@ Compatibility
     "author": "Mouadh Benhassine (Digidev Agency)",
     "website": "https://kyb.digidevagency.dz",
     "license": "LGPL-3",
+    "images": [
+        "static/description/banner.png",
+        "static/description/screenshot_pm_corporate.png",
+        "static/description/screenshot_temporal_audit.png",
+        "static/description/screenshot_autocomplete.png",
+    ],
     "depends": [
         "base",      # Odoo Core Engine
         "contacts",  # Client-Facing App: "Contacts" (res.partner)

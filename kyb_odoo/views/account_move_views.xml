@@ -14,8 +14,7 @@
                         type="object"
                         string="Audit KYB Compliance"
                         class="btn btn-secondary"
-                        icon="fa-shield"
-                        invisible="state != 'draft'"/>
+                        icon="fa-shield"/>
             </xpath>
 
             <!-- Status badge next to partner -->
@@ -28,64 +27,18 @@
                        decoration-muted="kyb_compliance_status == 'unverified'"/>
             </xpath>
 
-            <!-- Alert banner in the form sheet for critical radiation warning -->
-            <xpath expr="//sheet" position="before">
-                <div class="alert alert-danger mb-2"
-                     role="alert"
-                     invisible="kyb_compliance_status != 'non_compliant'">
-                    <strong>Alerte Statut Registre KYB (Fournisseur Radié) :</strong>
-                    <field name="kyb_compliance_message" readonly="1" class="d-block mt-1"/>
-                </div>
-            </xpath>
-
             <!-- Dedicated Permanent Tab: Audit de Statut & Conformité KYB -->
             <xpath expr="//notebook" position="inside">
                 <page string="Conformité &amp; Statut Registre KYB" name="kyb_audit_tab">
-                    <!-- Status Cards -->
-                    <div class="alert alert-success d-flex align-items-center mb-3"
-                         role="alert"
-                         invisible="kyb_compliance_status != 'compliant'">
+                    <div class="alert alert-info d-flex justify-content-between align-items-center mb-3" role="alert">
                         <div>
-                            <h5 class="mb-1 font-weight-bold text-success">✅ Fournisseur Actif au Registre (CNRC)</h5>
-                            <p class="mb-0">
-                                Le fournisseur est enregistré comme actif au registre du commerce à la date d'émission.
-                                Statut régulier au registre national du commerce (réf. Art. 169 &amp; 176 CIDTA / Art. 30 CTCA).
-                            </p>
+                            <strong>Audit Temporel KYB</strong> — Vérification du statut officiel au registre du commerce à la date d'émission (réf. Art. 169 &amp; 176 CIDTA / Art. 30 CTCA).
                         </div>
-                    </div>
-
-                    <div class="alert alert-danger d-flex align-items-center mb-3"
-                         role="alert"
-                         invisible="kyb_compliance_status != 'non_compliant'">
-                        <div>
-                            <h5 class="mb-1 font-weight-bold text-danger">⚠️ Signalement Registre — Fournisseur Radié</h5>
-                            <p class="mb-0">
-                                <strong>Fournisseur Radié du Registre de Commerce (CNRC).</strong>
-                                Le fournisseur fait l'objet d'une radiation sur les registres officiels (réf. Art. 169 &amp; 176 CIDTA / Art. 30 CTCA). Vérification comptable préalable recommandée.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-warning d-flex align-items-center mb-3"
-                         role="alert"
-                         invisible="kyb_compliance_status != 'warning'">
-                        <div>
-                            <h5 class="mb-1 font-weight-bold text-warning">⚠️ Attention — Statut Registre Particulier</h5>
-                            <p class="mb-0">
-                                Fournisseur suspendu ou anomalie détectée sur le registre public. Vérification recommandée auprès de votre administration.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-secondary d-flex align-items-center mb-3"
-                         role="alert"
-                         invisible="kyb_compliance_status != 'unverified'">
-                        <div>
-                            <h5 class="mb-1 font-weight-bold text-secondary">ℹ️ Facture Non Vérifiée</h5>
-                            <p class="mb-0">
-                                Cliquez sur <strong>« Vérifier la Facture »</strong> pour consulter le statut d'activité du fournisseur à la date d'émission.
-                            </p>
-                        </div>
+                        <button name="action_verify_kyb_compliance"
+                                type="object"
+                                string="Auditer la Facture"
+                                class="btn btn-primary btn-sm"
+                                icon="fa-shield"/>
                     </div>
 
                     <group>

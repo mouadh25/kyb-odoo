@@ -23,7 +23,7 @@
                         </setting>
                         <setting string="CNRC Autocomplete" help="Replaces international company search with the National Trade Registry via KYB.">
                             <field name="kyb_sovereign_autocomplete"/>
-                            <div class="content-group" invisible="not kyb_sovereign_autocomplete">
+                            <div class="content-group">
                                 <div class="mt8">
                                     <field name="kyb_allow_worldwide_fallback" class="oe_inline"/>
                                     <label for="kyb_allow_worldwide_fallback" string="Allow Worldwide Fallback Search" class="oe_inline"/>
@@ -37,7 +37,7 @@
 
                         <setting string="Temporal Invoice Compliance &amp; Blocking Policy" help="Enforce CIDTA Art. 169 &amp; 176 and CTCA Art. 30 rules on vendor bills.">
                             <field name="kyb_invoice_audit_enabled"/>
-                            <div class="content-group" invisible="not kyb_invoice_audit_enabled">
+                            <div class="content-group">
                                 <div class="row mt4">
                                     <label for="kyb_invoice_blocking_policy" class="col-lg-4 o_light_label" string="Action on Deregistered Supplier"/>
                                     <field name="kyb_invoice_blocking_policy"/>
@@ -51,7 +51,7 @@
 
                         <setting string="End-of-Month Global Audit (G50 Safety Net)" help="Automatically audit all current month vendor bills before statutory tax filing.">
                             <field name="kyb_eom_auto_audit"/>
-                            <div class="content-group" invisible="not kyb_eom_auto_audit">
+                            <div class="content-group">
                                 <div class="row mt4">
                                     <label for="kyb_eom_audit_day" class="col-lg-4 o_light_label" string="Execution Day of Month"/>
                                     <field name="kyb_eom_audit_day"/>

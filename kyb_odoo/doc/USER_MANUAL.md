@@ -102,7 +102,7 @@ Pour les personnes physiques (entreprises individuelles, commerçants de détail
    * Le statut officiel **🟢 Actif** est affiché.
 
 ![Fiche Commerçant Individuel Personne Physique](screenshots/03_individual_merchant_pp.png)
-*Figure 4 : Fiche d'un commerçant individuel vérifié (BOUZID MOHAMED) avec son RC Catégorie A et son NIF individuel.*
+*Figure 4 : Fiche d'un commerçant individuel vérifié (BENALI SOFIANE) avec son RC Catégorie A, son capital individuel N/A et son NIF individuel.*
 
 ---
 

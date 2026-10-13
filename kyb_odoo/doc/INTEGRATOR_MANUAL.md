@@ -175,7 +175,7 @@ Auto-complétion libre     Enrichissement      Résolution déterministe     Pro
 - **Resolution Flow:** Integrators and users resolve natural persons **deterministically** by providing the official **15-digit NIF** or **Category A/C RC**.
 
 ![Verified Person Partner](screenshots/scenario_s02_rc_cat_a_personne_physique.png)
-*Figure 10: Enriched Personne Physique contact (BOUZID MOHAMED, Commerçant) classified with is_company=False, Category A RC (51/00-0000006A).*
+*Figure 10: Enriched Personne Physique contact (BENALI SOFIANE, Commerçant) classified with is_company=False, Category A RC (26/00-16208703A26).*
 
 ![Verified Artisan Partner](screenshots/scenario_s03_rc_cat_c_artisan.png)
 *Figure 11: Enriched Artisan contact (COOPÉRATIVE ARTISANALE DU BOIS) classified with Category C RC (16/00-0012345C16).*
@@ -276,7 +276,7 @@ The connector's resilience, compliance, and edge-case handling have been verifie
 | # | Code | Scenario Description | Tested Identifier / Action | Verified Behavior & Screenshot Reference | Status |
 | :-: | :--- | :--- | :--- | :--- | :-: |
 | **01** | `S01` | **RC Category B (Corporate)** | `20/00-0072885B01` | Full two-phase resolution: EURL DIGI DEV AGENCY, `is_company=True`, Status `ACTIF` (*Figure 8*). | 🟢 PASS |
-| **02** | `S02` | **RC Category A (Personne Physique)** | `51/00-0000006A` | Deterministic resolution: BOUZID MOHAMED, `is_company=False`, Forme `Personne Physique` (*Figure 10*). | 🟢 PASS |
+| **02** | `S02` | **RC Category A (Personne Physique)** | `26/00-16208703A26` | Deterministic resolution: BENALI SOFIANE, `is_company=False`, Forme `Personne Physique` (*Figure 10*). | 🟢 PASS |
 | **03** | `S03` | **RC Category C (Artisan / Coop)** | `16C0012345` | Native Python parser extracts category `C` and formats to `16/00-0012345C16` (*Figure 11*). | 🟢 PASS |
 | **04** | `S04` | **RC Legacy Wilaya 00 (National)** | `00B0012637` | Grandfathered registry entity (BELLAT FER DISTRIBUTION) formatted as `00/00-0012637B00` (*Figure 9*). | 🟢 PASS |
 | **05** | `S05` | **15-Digit Corporate NIF (Prefix 0)** | `002025007288530` | Validates standard 15-digit company fiscal number, enriches legal card, sets `is_company=True`. | 🟢 PASS |

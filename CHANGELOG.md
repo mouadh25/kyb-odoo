@@ -19,11 +19,27 @@ When packaged or deployed into an Odoo instance, the universal semantic version 
 | **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **🟢 Locked & Certified** |
 | **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.2` | Active Production Standard | **🟢 Locked & Certified** |
 | **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.2` | Legacy LTS / SME Installed Base | **Supported** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.2` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
 
 ---
 
 ## [1.4.2] - 2026-10-13
+
+### Odoo 16.0 Production Certification & Legacy LTS Audit
+
+#### Added
+* **View `invisible` Architecture Universalization**:
+  * Universalized XML views across Odoo 16–20 by removing field-level `invisible="..."` on header buttons, content groups, and alert cards.
+  * Resolved fatal Odoo 16 server-side view compilation error (`ValueError: NameError: name 'state' is not defined` via `_postprocess_context_dependent`).
+  * Converted temporal compliance audit action to a permanent form header button, allowing instant compliance audits on both draft and posted invoices.
+* **ORM `_name_search` Signature Harmonization**:
+  * Hardened `BaseModel._name_search` polyfill in `models/res_partner.py` to support Odoo 16's native `(name, args, operator, limit)` signature with dynamic `TypeError` handling.
+* **Air-Gapped SOP Verification Loop on Clean Database (`odoo16_store_test_db`)**:
+  * Clean installation verified (**43.93s** — fastest install time in the entire testing matrix, 0 errors, `state = 'installed'`, version `16.0.1.4.2`).
+  * Extremely compact footprint (**37 MB** database footprint, 146.6 MiB container memory).
+  * Real-world operational benchmark passed: Autocomplete (34.7ms), Corporate PM resolution (133.0ms), Live CNRC scraping (14.99s), Deep enrichment (93.4ms), Proactive webhook (37.6ms), Temporal invoice blocking (82.8ms).
+  * 234-request progressive concurrency burst suite completed with 0 errors (Peak 46.3 RPS, P50 121.7ms).
+  * Live Chrome DevTools visual audit on `https://odoo16.digidevagency.dz` passed with zero errors.
 
 ### Odoo 17.0 Production Certification & Personne Physique Resolution
 

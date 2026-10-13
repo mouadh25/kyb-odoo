@@ -971,7 +971,7 @@ class ResPartner(models.Model):
                 name=name, domain=domain, operator=operator, limit=limit, order=order
             )
         return self.name_search(
-            name=name, domain=domain, operator=operator, limit=limit
+            name=name, args=domain, operator=operator, limit=limit
         )
 
     # ──────────────── Sovereign Autocomplete Overrides (Loi 25-11) ────────────────

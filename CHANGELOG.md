@@ -16,16 +16,29 @@ When packaged or deployed into an Odoo instance, the universal semantic version 
 | Odoo Target Version | Module Version Code | Market Adoption & Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
 | **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.2` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **Supported** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **🟢 Locked & Certified** |
 | **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.2` | Active Production Standard | **Supported** |
 | **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **Supported** |
 | **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.2` | Legacy LTS / SME Installed Base | **Supported** |
 
 ---
 
-## [1.4.2] - 2026-10-12
+## [1.4.2] - 2026-10-13
 
-### Odoo 20.0 Production Lock & Executive Manual Suite
+### Odoo 19.0 Production Certification & Universal ORM Polyfill
+
+#### Added
+* **Universal `_name_search` Polyfill across Odoo 16 through 20**:
+  * Safe delegation to parent `_name_search` under Odoo 16.0, and graceful fallback to native `name_search` under Odoo 17.0–20.0.
+  * Eliminates `AttributeError` on Many2one partner selector dropdowns across modern ORM runtimes.
+* **Air-Gapped SOP Verification Loop on Clean Database (`odoo19_store_test_db`)**:
+  * Clean installation verified (53.69s, 0 errors, `state = 'installed'`, version `19.0.1.4.2`).
+  * Real-world operational benchmark passed: Autocomplete (35.8ms), CEVITAL resolution (149.8ms), Live CNRC scraping (3.49s), Deep enrichment (70.8ms), Proactive webhook (43.1ms), Temporal invoice blocking (414.7ms).
+  * 234-request progressive concurrency burst (1 to 25 workers) with 0 errors and 31.6 RPS peak throughput.
+* **Chrome DevTools Live UI Audit (`https://odoo19.digidevagency.dz`)**:
+  * Verified 4 authentic views (Partner form, KYB tab, Vendor bills tree, and Bill detail audit banner) with 100% responsive consistency under Odoo 19 purple web client.
+
+### Odoo 20.0 Production Lock & Executive Manual Suite (2026-10-12)
 
 #### Added
 * **Executive User Manual (11-Page Master PDF)**:

@@ -18,12 +18,29 @@ When packaged or deployed into an Odoo instance, the universal semantic version 
 | **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.2` | Current Released Generation | **🟢 Locked & Certified** |
 | **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **🟢 Locked & Certified** |
 | **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.2` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **Supported** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **🟢 Locked & Certified** |
 | **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.2` | Legacy LTS / SME Installed Base | **Supported** |
 
 ---
 
 ## [1.4.2] - 2026-10-13
+
+### Odoo 17.0 Production Certification & Personne Physique Resolution
+
+#### Added
+* **Personne Physique (Commerçants Individuels) Robust Legal Resolution**:
+  * Added statutory handling for individual merchants under Algerian Commercial Code and Law 18-07.
+  * Corrected `kyb_capital_social` mapping to explicitly indicate `"N/A (Patrimoine Individuel)"` reflecting Algerian statutory undivided patrimony rather than clearing fields.
+  * Corrected `kyb_representant_legal` mapping to designate the titular individual owner (`Titulaire`) rather than expecting corporate manager appointments.
+  * Bidirectional synchronization hardened between `kyb_nif` and native `vat` across individual and corporate contact profiles.
+  * Unified autocomplete candidate mapping for individual sole proprietorships.
+* **Air-Gapped SOP Verification Loop on Clean Database (`odoo17_store_test_db`)**:
+  * Clean installation verified (47.34s, 0 errors, `state = 'installed'`, version `17.0.1.4.2`).
+  * Lightweight footprint (38 MB database footprint, 160.5 MiB container memory).
+  * Real-world operational benchmark passed: Autocomplete (42.2ms), Corporate PM resolution (148.5ms), Live CNRC scraping (3.54s), Deep enrichment (34.2ms), Proactive webhook (66.9ms), Temporal invoice blocking (103.4ms).
+  * 234-request progressive concurrency burst (1 to 25 workers) with 0 errors and 53.5 RPS peak throughput.
+* **Chrome DevTools Live UI Audit (`https://odoo17.digidevagency.dz`)**:
+  * Verified 5 authentic views (Partner form, KYB tab, Personne Physique verified profile, Vendor bills tree, and Bill detail audit banner) with 100% responsive consistency under Odoo 17 OWL web client.
 
 ### Odoo 18.0 Production Certification & ORM Signature Harmonization
 

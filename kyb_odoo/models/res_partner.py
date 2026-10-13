@@ -784,24 +784,26 @@ class ResPartner(models.Model):
             if capital and is_pm:
                 self.kyb_capital_social = str(capital)
             elif is_pp:
-                self.kyb_capital_social = False
+                self.kyb_capital_social = str(capital) if capital else "N/A (Patrimoine Individuel)"
 
             # Gérant / Représentant Légal:
             # - For PM (Personne Morale): Set to appointed corporate manager (Gérant / DG) from CNRC.
-            # - For PP (Personne Physique): Keep empty (False). In Algerian commercial law, an individual merchant
-            #   has no distinct corporate manager; setting it to the merchant's own name creates redundant clutter
-            #   and risks injecting erroneous data from secondary records.
+            # - For PP (Personne Physique): Set to titular individual owner / exploitant (Commerçant Titulaire).
             rep = data.get("representant_legal") or data.get("representantLegal")
             if is_pm and rep:
                 self.kyb_representant_legal = str(rep)
             elif is_pp:
-                self.kyb_representant_legal = False
+                self.kyb_representant_legal = str(rep) if rep else (f"{self.name} (Titulaire)" if self.name else False)
 
             nif = data.get("nif") or ""
             if nif:
                 self.kyb_nif = nif
                 if not self.vat:
                     self.vat = nif
+            elif self.vat and not self.kyb_nif:
+                self.kyb_nif = self.vat
+            elif self.kyb_nif and not self.vat:
+                self.vat = self.kyb_nif
 
             rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
             rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "") or ""
@@ -1266,8 +1268,13 @@ class ResPartner(models.Model):
             enrich_dict["kyb_forme_juridique"] = forme_val
         if data.get("capital_social") or data.get("capitalSocial"):
             enrich_dict["kyb_capital_social"] = str(data.get("capital_social") or data.get("capitalSocial"))
+        elif is_pp:
+            enrich_dict["kyb_capital_social"] = "N/A (Patrimoine Individuel)"
+
         if data.get("representant_legal") or data.get("representantLegal"):
             enrich_dict["kyb_representant_legal"] = str(data.get("representant_legal") or data.get("representantLegal"))
+        elif is_pp:
+            enrich_dict["kyb_representant_legal"] = str(enrich_dict.get("name") or "") + " (Titulaire)"
         if dz_country:
             enrich_dict["country_id"] = dz_country.id
         if state_id:

@@ -961,11 +961,17 @@ class ResPartner(models.Model):
         order: Optional[str] = None,
     ):
         """
-        Safe local partner search.
+        Safe local partner search compatible across Odoo 16 through 20.
+        Delegates to parent _name_search in Odoo 16, or native name_search in Odoo 17+.
         Eliminates duplicate background entity creations during live dropdown keystrokes.
         """
-        return super()._name_search(
-            name=name, domain=domain, operator=operator, limit=limit, order=order
+        parent_meth = getattr(super(), "_name_search", None)
+        if callable(parent_meth):
+            return parent_meth(
+                name=name, domain=domain, operator=operator, limit=limit, order=order
+            )
+        return self.name_search(
+            name=name, domain=domain, operator=operator, limit=limit
         )
 
     # ──────────────── Sovereign Autocomplete Overrides (Loi 25-11) ────────────────

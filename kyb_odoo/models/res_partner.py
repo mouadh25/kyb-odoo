@@ -969,9 +969,14 @@ class ResPartner(models.Model):
         """
         parent_meth = getattr(super(), "_name_search", None)
         if callable(parent_meth):
-            return parent_meth(
-                name=name, domain=domain, operator=operator, limit=limit, order=order
-            )
+            try:
+                return parent_meth(
+                    name=name, args=domain, operator=operator, limit=limit
+                )
+            except TypeError:
+                return parent_meth(
+                    name=name, domain=domain, operator=operator, limit=limit
+                )
         return self.name_search(
             name=name, args=domain, operator=operator, limit=limit
         )

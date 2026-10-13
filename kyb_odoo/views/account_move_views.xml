@@ -107,7 +107,7 @@
                             <field name="kyb_vendor_forme_juridique"/>
                             <field name="kyb_vendor_nif"/>
                             <field name="kyb_vendor_rc"/>
-                            <field name="kyb_vendor_date_radiation" invisible="not kyb_vendor_date_radiation"/>
+                            <field name="kyb_vendor_date_radiation"/>
                         </group>
                     </group>
 

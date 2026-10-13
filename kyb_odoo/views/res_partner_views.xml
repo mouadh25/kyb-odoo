@@ -47,7 +47,7 @@
                                    decoration-danger="kyb_statut_cnrc == 'RADIE'"
                                    decoration-warning="kyb_statut_cnrc == 'SUSPENDU'"
                                    decoration-muted="kyb_statut_cnrc == 'INCONNU'"/>
-                            <field name="kyb_date_radiation" invisible="kyb_statut_cnrc != 'RADIE'"/>
+                            <field name="kyb_date_radiation"/>
                             <field name="kyb_article_imposition"
                                    placeholder="Ex: 16010000001"/>
                             <field name="kyb_nis"

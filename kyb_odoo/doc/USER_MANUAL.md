@@ -92,17 +92,21 @@ Dès que vous cliquez sur l'entité retenue (ex: *CEVITAL MENERALS*) :
 
 Pour les personnes physiques (entreprises individuelles, commerçants de détail, artisans), la réglementation relative aux données personnelles (Loi 18-07) encadre la recherche nominale. Le connecteur permet leur identification directe par leurs identifiants officiels.
 
-### Procédure de résolution d'une Personne Physique :
+### Étape 1 : Saisie de l'identifiant individuel (NIF ou RC Catégorie A/C)
 1. Créez un contact et laissez l'option **Individu** sélectionnée (`is_company = False`).
-2. Saisissez son **NIF individuel à 15 chiffres** (commençant par le chiffre `1`, ex: `198451010000284`) ou son **Numéro RC Catégorie A ou C** (ex: `51/00-0000006A`).
-3. Le connecteur résout immédiatement le profil :
-   * La forme juridique est automatiquement qualifiée en `"Personne Physique"`.
-   * Le Registre de Commerce est normalisé en Catégorie A avec préfixe de Wilaya (`51/00-0000006A51`).
-   * L'adresse d'exercice et l'activité commerciale (`Commerce de détail de produits alimentaires`) sont importées.
-   * Le statut officiel **🟢 Actif** est affiché.
+2. Saisissez son **NIF individuel à 15 chiffres** (commençant par le chiffre `1`) ou son **Numéro RC Catégorie A ou C** (ex: `26A16208703` ou clé de test `000021623880453`).
+
+### Étape 2 : Résolution et enrichissement complet de la fiche Personne Physique
+Dès la saisie ou au clic sur **Vérifier Fiche KYB**, le connecteur résout immédiatement le profil :
+* **Forme juridique :** Qualifiée automatiquement en `"Personne Physique"`.
+* **Registre de Commerce normalisé :** Formaté au standard officiel Décret 05-468 (`26/00-16208703A26`).
+* **Capital social adapté :** Qualifié en `"N/A (Patrimoine Individuel)"` (absence de capital social statutaire distinct).
+* **Gouvernance & Titularité :** Titulaire exploitant renseigné (`BENALI SOFIANE (Titulaire)`).
+* **Activités économiques NAE :** Activité principale (`Commerce de détail d'ordinateurs...`) et activités secondaires répertoriées.
+* **Statut officiel & Traçabilité :** Badge vert **🟢 Actif** affiché et carte institutionnelle détaillée consignée au fil Chatter.
 
 ![Fiche Commerçant Individuel Personne Physique](screenshots/03_individual_merchant_pp.png)
-*Figure 4 : Fiche d'un commerçant individuel vérifié (BENALI SOFIANE) avec son RC Catégorie A, son capital individuel N/A et son NIF individuel.*
+*Figure 4 : Fiche Personne Physique enrichie (BENALI SOFIANE) avec son RC Catégorie A, son capital individuel N/A et son fil d'audit Chatter complet.*
 
 ---
 

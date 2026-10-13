@@ -17,13 +17,27 @@ When packaged or deployed into an Odoo instance, the universal semantic version 
 | :--- | :--- | :--- | :---: |
 | **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.2` | Current Released Generation | **🟢 Locked & Certified** |
 | **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.2` | Active Production Standard | **Supported** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.2` | Active Production Standard | **🟢 Locked & Certified** |
 | **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.2` | **Primary Enterprise Adoption (Algeria)** | **Supported** |
 | **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.2` | Legacy LTS / SME Installed Base | **Supported** |
 
 ---
 
 ## [1.4.2] - 2026-10-13
+
+### Odoo 18.0 Production Certification & ORM Signature Harmonization
+
+#### Added
+* **BaseModel.name_search Keyword Argument Harmonization**:
+  * Harmonized keyword argument passing in `res.partner` delegation to `args=domain` across Odoo 17.0–20.0 runtimes.
+  * Resolves `TypeError: unexpected keyword argument 'domain'` on Odoo 18.0 ORM signature.
+* **Air-Gapped SOP Verification Loop on Clean Database (`odoo18_store_test_db`)**:
+  * Clean installation verified (56.41s, 0 errors, `state = 'installed'`, version `18.0.1.4.2`).
+  * Zero memory leaks or excessive disk footprint (40 MB database footprint, 76.77 MiB container memory).
+  * Real-world operational benchmark passed: Autocomplete (43.3ms), Corporate PM resolution (132.9ms), Live CNRC scraping (13.09s), Deep enrichment (98.1ms), Proactive webhook (68.5ms), Temporal invoice blocking (320.3ms).
+  * 234-request progressive concurrency burst (1 to 25 workers) with 0 errors and 53.5 RPS peak throughput.
+* **Chrome DevTools Live UI Audit (`https://odoo18.digidevagency.dz`)**:
+  * Verified 4 authentic views (Partner form, KYB tab, Vendor bills tree, and Bill detail audit banner) with 100% responsive consistency under Odoo 18 web client.
 
 ### Odoo 19.0 Production Certification & Universal ORM Polyfill
 

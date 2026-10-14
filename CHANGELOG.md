@@ -23,7 +23,21 @@ When packaged or deployed into an Odoo instance, the universal semantic version 
 
 ---
 
-## [1.4.2] - 2026-10-13
+## [1.4.2] - 2026-10-13 (Updated 2026-10-14)
+
+### Odoo 16–20 Production Certification & Store Presentation Overhaul
+
+#### Added
+* **Official 7-Day Free Trial (100 Credits) Store Integration**:
+  * Prominent hero trial showcase in `static/description/index.html` offering 100 free live CNRC/DGI verification credits and up to 3 sub-keys for test/staging/production instances.
+  * Direct onboarding CTA linking to `https://kyb.digidevagency.dz/onboarding` (`target="_blank"`).
+  * Direct API documentation reference linking to `https://kyb.digidevagency.dz/docs/scalar`.
+
+#### Changed
+* **Institutional Authority Store Presentation (`index.html`)**:
+  * Complete purging of legacy indigo accents (`#533afd`) and artificial card border stripes.
+  * Unified typography pairing Inter at weight 300 with negative tracking and tabular numerals (`tnum`).
+  * Restrained monochromatic zinc palette (`#18181b` primary CTAs, `#ffffff` card surfaces, `#e4e4e7` hairline borders).
 
 ### Odoo 16.0 Production Certification & Legacy LTS Audit
 

@@ -249,7 +249,7 @@ Under Algerian Tax Law, expenses and VAT originating from suppliers deregistered
 | `kyb_rc` | `Char(30)` | Official Commercial Register (`WW/00-XXXXXXX[A-D]YY`) | Décret 05-468 & 18-112 |
 | `kyb_nis` | `Char(30)` | Statistical Identifier (ONS) | ONS |
 | `kyb_article_imposition` | `Char(30)` | Article d'Imposition (Numéro de Rôle) | Secret Fiscal (Art. 114 CPF) |
-| `kyb_statut_cnrc` | `Selection` | Status: `ACTIF`, `RADIE`, `SUSPENDU`, `INCONNU` | CNRC Sidjilcom |
+| `kyb_statut_cnrc` | `Selection` | Status: `ACTIF`, `RADIE`, `SUSPENDU`, `INCONNU` | Registre du Commerce (CNRC) |
 | `kyb_date_radiation` | `Date` | Official deregistration date | CNRC BOAL Gazette |
 | `kyb_forme_juridique` | `Char` | Legal structure (`SARL`, `EURL`, `Personne Physique`...) | Code de Commerce |
 | `kyb_capital_social` | `Char` | Registered Share Capital (e.g. `10 000 000 DZD`) | CNRC |

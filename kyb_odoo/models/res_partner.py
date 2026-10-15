@@ -158,7 +158,7 @@ class _NativeKybClient:
         return self._handle_response(resp)
 
     def candidates(self, query: str, limit: int = 20, live: bool = False) -> dict:
-        """Search entity candidates with optional live CNRC scraper trigger."""
+        """Search entity candidates with optional authoritative live registry verification."""
         import time
         url = f"{self.base_url}/api/v1/entity/candidates"
         params = {"q": query, "limit": limit}

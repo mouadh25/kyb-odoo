@@ -29,7 +29,7 @@ Developed and maintained by **Mouadh Benhassine** ([@mouadh25](https://github.co
   * <span style="color:#10b981">**ACTIF**</span> â€” Active and legally registered company.
   * <span style="color:#ef4444">**RADIÃ‰**</span> â€” Deregistered vendor (non-deductible expense warning).
   * <span style="color:#f59e0b">**SUSPENDU**</span> â€” Temporarily suspended registration.
-* **Configurable HTTP Timeout & Built-in Observability:** Configurable `kyb.timeout` (default 35.0s) supporting deep live scrapes, paired with real-time roundtrip timing logs (`_logger.info`) for end-to-end telemetry.
+* **Configurable HTTP Timeout & Built-in Observability:** Configurable `kyb.timeout` (default 35.0s) supporting high-reliability lookups, paired with real-time roundtrip timing logs (`_logger.info`) for end-to-end telemetry.
 * **100% Data Residency in Algeria (Law 18-07 / Law 25-11):** Direct connection to KYB API (by Digidev) hosted at the AlgÃ©rie TÃ©lÃ©com Cloud Datacenter in Algiers. Zero data egress to offshore cloud providers.
 
 ---
@@ -51,7 +51,7 @@ Developed and maintained by **Mouadh Benhassine** ([@mouadh25](https://github.co
               â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€>â”‚
               â”‚                                                 â”‚
               â”‚  3. Sub-80ms resolution in KYB Database         â”‚
-              â”‚     (or real-time CNRC extraction & cache sync) â”‚
+              â”‚     (authoritative registry resolution & cache sync) â”‚
               â”‚<â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
               â”‚     Returns: Raison Sociale, RC, NIS,           â”‚
               â”‚     Article d'Imposition, Status, Radiation Dateâ”‚
@@ -109,7 +109,7 @@ Navigate to **Settings â†’ Technical â†’ Parameters â†’ System Pa
 | :--- | :--- | :--- |
 | `kyb.api_key` | `sk_live_...` (or test key `sk_test_kyb_sandbox_key_001`) | Your KYB API Bearer token. |
 | `kyb.base_url` | `https://kyb.digidevagency.dz` | Official sovereign gateway endpoint. |
-| `kyb.timeout` | `35.0` | HTTP request timeout in seconds (handles deep live scrapes). |
+| `kyb.timeout` | `35.0` | HTTP request timeout in seconds (handles high-reliability lookups). |
 | `kyb.sovereign_autocomplete` | `True` | Intercept native autocomplete to enforce sovereign data residency (Loi 25-11). |
 
 > **Tip:** You can test immediately using the public sandbox key `sk_test_kyb_sandbox_key_001` with zero billing charges.

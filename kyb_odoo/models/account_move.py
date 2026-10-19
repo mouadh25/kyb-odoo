@@ -82,13 +82,30 @@ class AccountMove(models.Model):
     )
 
     @api.model
-    def _is_verified_today(self, partner):
-        """Check if partner's KYB verification is fresh as of today (same-day cache)."""
+    def _is_fresh_24h(self, partner):
+        """
+        Check if partner's KYB verification is fresh within a rolling 24-hour window.
+        
+        Fintech Best Practice & Algerian 2026 Fiscal Rule:
+        Avoids artificial calendar-day expiration (e.g. verified Wednesday 15:00,
+        erroneously expiring Thursday 08:00 after only 17 hours).
+        Provides exactly 86,400 seconds (24 real hours) of temporal validity,
+        preventing double-billing of credits across afternoon/morning work sessions.
+        
+        Legal Alignment (Loi Fiscale 2026):
+        - Art. 169 & 176 CIDTA: Prior mandatory authentication of counterparty.
+        - Art. 30 CTCA: Deductibility of VAT requires valid active registration at transaction time.
+        - Code de Commerce Art. 23/24: Opposabilité des actes et date d'effet CNRC.
+        """
         if not partner or not partner.kyb_last_verified:
             return False
-        today_date = fields.Date.context_today(self)
-        verified_date = fields.Date.to_date(partner.kyb_last_verified)
-        return verified_date == today_date
+        delta = fields.Datetime.now() - partner.kyb_last_verified
+        return delta.total_seconds() < 86400  # 24 real hours
+
+    @api.model
+    def _is_verified_today(self, partner):
+        """Backward compatibility alias pointing to rolling 24h freshness."""
+        return self._is_fresh_24h(partner)
 
     @api.onchange("partner_id", "invoice_date")
     def _onchange_kyb_temporal_compliance(self):
@@ -109,10 +126,10 @@ class AccountMove(models.Model):
                 continue
 
             partner = move.partner_id
-            # 24-Hour Just-In-Time Freshness Rule:
-            # If partner has NIF/RC and has NOT been verified today, re-resolve live legal standing.
-            # If already verified today, reuse local verified profile (0 credits, <1ms).
-            if (partner.kyb_nif or partner.kyb_rc) and not self._is_verified_today(partner):
+            # 24-Hour Rolling Just-In-Time Freshness Rule:
+            # If partner has NIF/RC and has NOT been verified within the last 24h, re-resolve live legal standing.
+            # If already verified within 24h, reuse local verified profile (0 credits, <1ms).
+            if (partner.kyb_nif or partner.kyb_rc) and not self._is_fresh_24h(partner):
                 try:
                     partner.action_verify_kyb()
                 except Exception as e:
@@ -243,7 +260,7 @@ class AccountMove(models.Model):
             for move in self:
                 if move.is_invoice(include_receipts=True) and move.is_purchase_document(include_receipts=True):
                     partner = move.partner_id
-                    if partner and (partner.kyb_nif or partner.kyb_rc) and not self._is_verified_today(partner):
+                    if partner and (partner.kyb_nif or partner.kyb_rc) and not self._is_fresh_24h(partner):
                         try:
                             partner.action_verify_kyb()
                         except Exception as e:

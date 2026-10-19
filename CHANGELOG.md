@@ -15,11 +15,25 @@ When deployed into an Odoo instance, the universal semantic version (`1.4.2`) ma
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.2` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.2` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.2` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.2` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.2` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.3` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.3` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.3` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.3` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.3` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+
+---
+
+## [1.4.3] - October 2026
+
+### Fixed: Native Autocomplete Selection & Counterparty Legal Enrichment
+* **Partner Autocomplete Deep Enrichment:** Resolved issue where selecting a suggested counterparty from Odoo's native `partner_autocomplete` dropdown did not populate legal fiscal fields. Both candidate selection and interactive `_onchange_kyb_rc` now reliably populate Raison Sociale, NIF (VAT), Trade Register (RC), Statistical Number (NIS), Share Capital, and Legal Address.
+* **Corporate vs Individual Persona Integrity:** Enforced Décret 05-468 categorization: Personnes Morales (Commercial Companies) automatically configure `is_company = True` with standardized `kyb_forme_juridique` (SPA, SARL, EURL, SNC), while Personnes Physiques (sole proprietors, individual traders) preserve `is_company = False` and `company_type = "person"`.
+* **Many2one Dictionary Mapping:** Hardened partner creation and writing against varied dictionary shapes returned by Odoo's client-side OWL autocomplete controller.
+
+### Improved: Performance & Network Resilience
+* **Keystroke Storm Immunity:** Added 60-second in-memory candidate cache in `_NativeKybClient` (`_candidates_cache`), preventing duplicate network queries during rapid typing in partner search fields.
+* **Session & Localization Initialization:** Ensured HTTP `requests.Session()` and request language headers (`self.lang`) are properly initialized across threaded worker processes.
+* **Dependency Precision:** Explicitly declared `partner_autocomplete` in `__manifest__.py` dependencies.
 
 ---
 

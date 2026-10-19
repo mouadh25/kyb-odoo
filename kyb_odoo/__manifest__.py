@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "KYB — Algerian Corporate Identity & Temporal Fiscal Compliance",
-    "version": "20.0.1.4.2",
+    "version": "16.0.1.4.3",
     "category": "Accounting/Localisation",
     "summary": "Instant NIF/RC verification (<10ms), temporal strike-off audit (CIDTA Art. 176), and auto-completion for Algerian counterparties.",
     "description": """
@@ -26,11 +26,13 @@ Required Apps (Client-Facing Naming)
   Free Community application. Does **NOT** require the paid Enterprise "Accounting" (*Comptabilité* / ``account_accountant``) module. Provides vendor bills, customer invoices, and fiscal settings.
 * **Contacts** (French: *Contacts* — technical module: ``contacts``):
   Free Community directory application. Provides counterparty records, address management, and legal fiscal badges.
+* **Partner Autocomplete** (technical module: ``partner_autocomplete``):
+  Standard Odoo framework engine providing interactive typing suggestions on partner names and automatic company enrichment.
 
 Version-Specific Details
 ------------------------
 * **Odoo 16.0, 17.0, 18.0, 19.0**:
-  - Requires the standard free **Invoicing** (*Facturation*) and **Contacts** apps.
+  - Requires the standard free **Invoicing** (*Facturation*), **Contacts**, and **Partner Autocomplete** apps.
   - Activating KYB automatically installs both apps if they are not already installed.
 * **Odoo 20.0**:
   - The **Invoicing** (*Facturation*) engine is pre-bundled in the foundational commercial installation with **Contacts** active by default.
@@ -58,9 +60,10 @@ Compatibility
         "static/description/screenshot_autocomplete.png",
     ],
     "depends": [
-        "base",      # Odoo Core Engine
-        "contacts",  # Client-Facing App: "Contacts" (res.partner)
-        "account",   # Client-Facing App: "Invoicing" / Facturation (Free Community module, NOT paid Accounting)
+        "base",                  # Odoo Core Engine
+        "contacts",              # Client-Facing App: "Contacts" (res.partner)
+        "account",               # Client-Facing App: "Invoicing" / Facturation (Free Community module, NOT paid Accounting)
+        "partner_autocomplete",  # Native Odoo Partner Autocomplete Engine
     ],
     "data": [
         "security/kyb_security.xml",

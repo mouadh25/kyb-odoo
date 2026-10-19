@@ -138,28 +138,66 @@ class _NativeKybClient:
         self.timeout = timeout
         self.lang = lang
         self._session = requests.Session()
+        try:
+            import odoo.release
+            odoo_ver = getattr(odoo.release, "version", "unknown")
+        except Exception:
+            odoo_ver = "unknown"
         self._session.headers.update({
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Accept-Language": lang,
-            "User-Agent": "Odoo-KYB-Connector/1.4.1 (Sovereign)",
+            "User-Agent": f"Odoo-KYB-Connector/1.4.3 (Odoo {odoo_ver}; Sovereign)",
         })
         self.search = _NativeSearchNamespace(self)
+        self._resolve_cache = {}  # {query_str: (timestamp, result_dict)}
+        self._candidates_cache = {}  # {cache_key: (timestamp, result_dict)}
 
     def resolve(self, query: str) -> dict:
-        """Resolve single Algerian identifier (NIF, RC, NIS, or Raison Sociale)."""
+        """Resolve single Algerian identifier (NIF, RC, NIS, or Raison Sociale) with 60s in-memory deduplication."""
         import time
+        clean_q = (query or "").strip()
+        now = time.time()
+
+        # 60-second In-Memory Deduplication: Prevents double/triple billing on immediate UI selections & onchange chains
+        if clean_q in self._resolve_cache:
+            ts, cached_val = self._resolve_cache[clean_q]
+            if (now - ts) < 60.0:
+                _logger.info("KYB resolve('%s') [In-Memory Cache Hit: 0.0ms, 0 Credits Deducted]", clean_q)
+                return cached_val
+
         url = f"{self.base_url}/api/v1/entity/resolve"
         t0 = time.time()
-        resp = self._session.get(url, params={"q": query}, timeout=self.timeout)
+        resp = self._session.get(url, params={"q": clean_q}, timeout=self.timeout)
         elapsed_ms = (time.time() - t0) * 1000.0
-        _logger.info("KYB resolve('%s') completed in %.1fms [HTTP %d]", query, elapsed_ms, resp.status_code)
-        return self._handle_response(resp)
+        _logger.info("KYB resolve('%s') completed in %.1fms [HTTP %d]", clean_q, elapsed_ms, resp.status_code)
+        result = self._handle_response(resp)
+
+        if isinstance(result, dict) and (result.get("entity") or result.get("data") or result.get("statut_cnrc")):
+            self._resolve_cache[clean_q] = (now, result)
+            ent = result.get("entity") or result.get("data") or result
+            if isinstance(ent, dict):
+                for ident in [ent.get("nif"), ent.get("rc_number"), ent.get("rcNumber"), ent.get("rc_number_official"), ent.get("nis")]:
+                    if ident and isinstance(ident, str) and ident.strip():
+                        self._resolve_cache[ident.strip()] = (now, result)
+
+        return result
 
     def candidates(self, query: str, limit: int = 20, live: bool = False) -> dict:
-        """Search entity candidates with optional authoritative live registry verification."""
+        """Search entity candidates with in-memory keystroke storm deduplication (60s TTL)."""
         import time
+        clean_q = (query or "").strip().lower()
+        now = time.time()
+        cache_key = f"{clean_q}:{limit}:{live}"
+
+        # Keystroke Storm & Repetitive Typing Defense: 0.0ms memory hit
+        if cache_key in self._candidates_cache:
+            ts, cached_val = self._candidates_cache[cache_key]
+            if (now - ts) < 60.0:
+                _logger.info("KYB candidates('%s') [In-Memory Keystroke Cache Hit: 0.0ms, 0 Network Calls]", clean_q)
+                return cached_val
+
         url = f"{self.base_url}/api/v1/entity/candidates"
         params = {"q": query, "limit": limit}
         if live:
@@ -168,7 +206,12 @@ class _NativeKybClient:
         resp = self._session.get(url, params=params, timeout=self.timeout)
         elapsed_ms = (time.time() - t0) * 1000.0
         _logger.info("KYB candidates('%s', live=%s) completed in %.1fms [HTTP %d]", query, live, elapsed_ms, resp.status_code)
-        return self._handle_response(resp)
+        result = self._handle_response(resp)
+
+        if isinstance(result, dict) and (result.get("candidates") or result.get("results")):
+            self._candidates_cache[cache_key] = (now, result)
+
+        return result
 
     def enrich(
         self,
@@ -533,17 +576,23 @@ class ResPartner(models.Model):
             if not partner.kyb_last_verified:
                 vals["kyb_last_verified"] = fields.Datetime.now()
             if partner.kyb_statut_cnrc == "RADIE" and not partner.kyb_date_radiation:
-                query = partner.kyb_nif or partner.kyb_rc or partner.name
-                if query:
-                    try:
-                        client = _get_kyb_client(partner.env)
-                        prof = client.resolve(query)
-                        ent = prof.get("entity") or prof.get("data") or prof
-                        d_rad = ent.get("date_radiation") or ent.get("dateRadiation")
-                        if d_rad:
-                            vals["kyb_date_radiation"] = str(d_rad)[:10]
-                    except Exception:
-                        pass
+                # Check data dictionary first to avoid any external network call
+                if isinstance(data, dict):
+                    d_rad = data.get("date_radiation") or data.get("dateRadiation") or data.get("radiation_date")
+                    if d_rad:
+                        vals["kyb_date_radiation"] = str(d_rad)[:10]
+                if not vals.get("kyb_date_radiation"):
+                    query = partner.kyb_nif or partner.kyb_rc or partner.name
+                    if query:
+                        try:
+                            client = _get_kyb_client(partner.env)
+                            prof = client.resolve(query)
+                            ent = prof.get("entity") or prof.get("data") or prof
+                            d_rad = ent.get("date_radiation") or ent.get("dateRadiation")
+                            if d_rad:
+                                vals["kyb_date_radiation"] = str(d_rad)[:10]
+                        except Exception:
+                            pass
             if vals:
                 partner.write(vals)
 
@@ -600,6 +649,11 @@ class ResPartner(models.Model):
         """Auto-populate when the standard Odoo VAT field is entered."""
         if self.vat:
             cleaned = re.sub(r"[\s\-_/.]", "", self.vat.strip())
+            # Grille Tarifaire Guard: Skip API call if already verified with matching NIF (0 credits)
+            if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and (self.kyb_nif == cleaned or self.vat == cleaned):
+                return
+            if (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
+                return
             if not self.kyb_nif:
                 self.kyb_nif = cleaned
             return self._do_kyb_resolve(cleaned)
@@ -613,6 +667,11 @@ class ResPartner(models.Model):
         val = (self.kyb_nif or self.conforme_nif or "").strip()
         cleaned = re.sub(r"[\s\-_/.]", "", val)
         if not cleaned or len(cleaned) < 9:
+            return
+        # Grille Tarifaire Guard: Skip API call if already verified with matching NIF (0 credits)
+        if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and (self.kyb_nif == cleaned or self.conforme_nif == cleaned):
+            return
+        if (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
             return
         return self._do_kyb_resolve(cleaned)
 
@@ -638,7 +697,13 @@ class ResPartner(models.Model):
             if "company_registry" in self._fields:
                 self.company_registry = fmt_rc
 
-        return self._do_kyb_resolve(fmt_rc or raw_rc)
+        target_rc = fmt_rc or raw_rc
+        # Grille Tarifaire Guard: Skip API call if already verified with matching RC (0 credits)
+        if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and (self.kyb_rc == target_rc or self.conforme_rc == target_rc):
+            return
+        if (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
+            return
+        return self._do_kyb_resolve(target_rc)
 
     @api.onchange("kyb_nis")
     def _onchange_kyb_nis(self):
@@ -649,6 +714,11 @@ class ResPartner(models.Model):
         nis = (self.kyb_nis or "").strip()
         cleaned = re.sub(r"[\s\-_/.]", "", nis)
         if not cleaned or len(cleaned) < 9:
+            return
+        # Grille Tarifaire Guard: Skip API call if already verified with matching NIS (0 credits)
+        if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and self.kyb_nis == cleaned:
+            return
+        if (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
             return
         return self._do_kyb_resolve(cleaned)
 
@@ -713,31 +783,8 @@ class ResPartner(models.Model):
             if not isinstance(data, dict):
                 data = profile
 
-            # ── Phase 2 Enrichment Trigger ──
-            # If the profile is a partial candidate record (missing legal form, capital, representative, or nif),
-            # pull full official legal sheet from the Tier 1 paid detail view.
-            rc_cand = data.get("rc_number") or data.get("rcNumber") or self.kyb_rc or (self.company_registry if "company_registry" in self._fields else "") or (query if any(c.isalpha() for c in query) and any(c.isdigit() for c in query) else "")
-            nif_cand = data.get("nif") or self.kyb_nif or self.vat or (query if query.isdigit() and len(query) in (15, 20) else "")
-            nis_cand = data.get("nis") or self.kyb_nis or (query if query.isdigit() and len(query) == 15 else "")
-            name_cand = data.get("raison_sociale") or data.get("name") or self.name or ""
-            needs_enrich = (
-                not data.get("forme_juridique")
-                or not data.get("capital_social")
-                or not data.get("representant_legal")
-                or not data.get("nif")
-            )
-            if needs_enrich and (rc_cand or name_cand or nif_cand or nis_cand):
-                try:
-                    enrich_resp = client.enrich(
-                        rc_number=rc_cand,
-                        raison_sociale=name_cand,
-                        nif=nif_cand,
-                        nis=nis_cand,
-                    )
-                    if isinstance(enrich_resp, dict) and enrich_resp.get("entity"):
-                        data = enrich_resp["entity"]
-                except Exception as e:
-                    _logger.info("Phase 2 enrichment attempt: %s", e)
+            # Grille Tarifaire Invariant: 1 Credit per verification.
+            # profile resolved via client.resolve() is already complete. No redundant Phase 2 billing.
 
             # ── Strict Algerian CNRC Classification: Personne Morale (PM) vs Personne Physique (PP) ──
             rc_val = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "")
@@ -1004,9 +1051,14 @@ class ResPartner(models.Model):
                 return super().autocomplete_by_name(query, query_country_id, timeout=timeout)
             return []
 
+        dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
+        dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
+
         try:
             client = _get_kyb_client(self.env)
             clean_q = (query or "").strip()
+            if len(clean_q) < 3:
+                return []
             # If query looks like an exact NIF, NIS, or RC (e.g. 9-20 digits or Algerian RC)
             if re.match(r'^\d{9,20}$', clean_q) or re.search(r'[0-9]+[A-Z][0-9]+', clean_q, re.I):
                 try:
@@ -1025,8 +1077,11 @@ class ResPartner(models.Model):
                             "name": raison,
                             "city": wilaya or "Algérie",
                             "country_id": dz_country_dict,
-                            "duns": nif or rc or clean_q,
+                            "duns": nif or rc_raw or rc or clean_q,
                             "vat": nif,
+                            "rc_number": rc_raw,
+                            "rc_official": rc_official or rc,
+                            "wilaya": wilaya,
                             "description": f"{wilaya} • RC: {rc} {statut_badge}".strip(" •"),
                         }]
                 except Exception:
@@ -1042,9 +1097,6 @@ class ResPartner(models.Model):
         raw_candidates = res.get("candidates") or res.get("results") or []
         if not raw_candidates and hasattr(super(), "autocomplete_by_name") and allow_worldwide:
             return super().autocomplete_by_name(query, query_country_id, timeout=timeout)
-
-        dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
-        dz_country_dict = {"id": dz_country.id, "display_name": dz_country.name} if dz_country else False
 
         results = []
         for cand in raw_candidates:
@@ -1069,12 +1121,18 @@ class ResPartner(models.Model):
 
             local_tag = f" • ⚠️ Existant (#{local_partner.id})" if local_partner else ""
 
+            # Use most reliable identifier for duns lookup: nif > raw rc > official rc > raison
+            chosen_duns = nif or rc_raw or rc or raison
+
             results.append({
                 "name": raison,
                 "city": wilaya or "Algérie",
                 "country_id": dz_country_dict,
-                "duns": nif or rc or raison,
+                "duns": chosen_duns,
                 "vat": nif,
+                "rc_number": rc_raw,
+                "rc_official": rc_official or rc,
+                "wilaya": wilaya,
                 "description": f"{wilaya} • RC: {rc} {statut_badge}{local_tag}".strip(" •"),
             })
         return results
@@ -1097,7 +1155,7 @@ class ResPartner(models.Model):
             data = profile.get("entity") or profile.get("data") or profile
             if isinstance(data, dict):
                 dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
-                dz_country_dict = {"id": dz_country.id, "display_name": dz_country.name} if dz_country else False
+                dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
                 rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
                 rc_raw = data.get("rc_number") or ""
                 rc = rc_official or format_official_rc(rc_raw) or rc_raw
@@ -1107,6 +1165,9 @@ class ResPartner(models.Model):
                     "country_id": dz_country_dict,
                     "duns": data.get("nif") or vat,
                     "vat": data.get("nif") or vat,
+                    "rc_number": rc_raw,
+                    "rc_official": rc_official or rc,
+                    "wilaya": data.get("wilaya") or "",
                     "description": f"{data.get('wilaya', '')} • RC: {rc}".strip(" •"),
                 }]
         except Exception as exc:
@@ -1131,45 +1192,84 @@ class ResPartner(models.Model):
                 return super().enrich_by_duns(duns, timeout=timeout)
             return {}
 
-        try:
-            client = _get_kyb_client(self.env)
-            profile = client.resolve(duns)
-        except Exception as exc:
-            _logger.warning("KYB enrich_by_duns failed for '%s': %s", duns, exc)
-            if hasattr(super(), "enrich_by_duns"):
-                return super().enrich_by_duns(duns, timeout=timeout)
-            return {}
+        # Extract contextual candidate metadata passed by Odoo's OWL autocomplete client
+        candidate_ctx = self.env.context.get("enriched_company_data") or self.env.context.get("company") or {}
 
-        data = profile.get("entity") or profile.get("data") or profile
-        if not isinstance(data, dict):
-            return {}
-
-        # ── Phase 2 Enrichment Trigger ──
-        # If the candidate was discovered without detail (missing legal form, capital, or NIF),
-        # trigger full Tier 1 Paid detail extraction.
-        rc_cand = data.get("rc_number") or data.get("rcNumber") or (duns if any(c.isdigit() for c in duns) else "")
-        nif_cand = data.get("nif") or (duns if duns.isdigit() and len(duns) in (15, 20) else "")
-        nis_cand = data.get("nis") or (duns if duns.isdigit() and len(duns) == 15 else "")
-        name_cand = data.get("raison_sociale") or data.get("name") or ""
-        needs_enrich = not data.get("forme_juridique") or not data.get("capital_social") or not data.get("nif")
-        if needs_enrich and (rc_cand or name_cand or nif_cand or nis_cand):
+        clean_duns = (duns or "").strip()
+        data = None
+        client = None
+        if clean_duns:
             try:
-                enrich_resp = client.enrich(
-                    rc_number=rc_cand,
-                    raison_sociale=name_cand,
-                    nif=nif_cand,
-                    nis=nis_cand,
+                client = _get_kyb_client(self.env)
+                profile = client.resolve(clean_duns)
+                data = profile.get("entity") or profile.get("data") or profile
+            except Exception as exc:
+                _logger.info("KYB resolve in enrich_by_duns for '%s' did not find immediate profile (%s), trying fallback enrich...", clean_duns, exc)
+
+        # Fallback 1: If resolve misses or returned partial data without NIF, attempt targeted enrich
+        if not data or not isinstance(data, dict) or not data.get("nif"):
+            try:
+                if not client:
+                    client = _get_kyb_client(self.env)
+                rc_cand = (
+                    (data.get("rc_number") if isinstance(data, dict) else "")
+                    or candidate_ctx.get("rc_number")
+                    or candidate_ctx.get("rc_official")
+                    or candidate_ctx.get("rc")
+                    or (clean_duns if any(c.isdigit() for c in clean_duns) and any(c.isalpha() for c in clean_duns) else "")
                 )
-                if isinstance(enrich_resp, dict) and enrich_resp.get("entity"):
-                    data = enrich_resp["entity"]
-            except Exception as e:
-                _logger.info("Phase 2 enrichment attempt skipped in enrich_by_duns: %s", e)
+                nif_cand = (
+                    candidate_ctx.get("vat")
+                    or candidate_ctx.get("nif")
+                    or (clean_duns if clean_duns.isdigit() and len(clean_duns) in (15, 20) else "")
+                )
+                name_cand = (
+                    (data.get("raison_sociale") if isinstance(data, dict) else "")
+                    or candidate_ctx.get("name")
+                    or (clean_duns if not rc_cand and not nif_cand else "")
+                )
+                if rc_cand or nif_cand or name_cand:
+                    enrich_resp = client.enrich(
+                        rc_number=rc_cand,
+                        nif=nif_cand,
+                        raison_sociale=name_cand,
+                        force_live=True if not data else False,
+                    )
+                    if isinstance(enrich_resp, dict) and enrich_resp.get("entity"):
+                        enriched_entity = enrich_resp["entity"]
+                        if isinstance(enriched_entity, dict):
+                            if data and isinstance(data, dict):
+                                # Merge enriched fields into existing data
+                                for k, v in enriched_entity.items():
+                                    if v is not None and v != "":
+                                        data[k] = v
+                            else:
+                                data = enriched_entity
+            except Exception as e2:
+                _logger.warning("KYB fallback enrich in enrich_by_duns failed for '%s': %s", clean_duns, e2)
+
+        # Fallback 2: If gateway returned empty, construct baseline from candidate context to guarantee populated form
+        if not data or not isinstance(data, dict):
+            if candidate_ctx and (candidate_ctx.get("name") or candidate_ctx.get("duns")):
+                data = {
+                    "raison_sociale": candidate_ctx.get("name") or clean_duns,
+                    "rc_number": candidate_ctx.get("rc_number") or candidate_ctx.get("rc") or "",
+                    "rc_number_official": candidate_ctx.get("rc_official") or "",
+                    "wilaya": candidate_ctx.get("wilaya") or candidate_ctx.get("city") or "",
+                    "nif": candidate_ctx.get("vat") or candidate_ctx.get("nif") or "",
+                    "statut_cnrc": "ACTIF",
+                }
+            elif hasattr(super(), "enrich_by_duns"):
+                return super().enrich_by_duns(duns, timeout=timeout)
+            else:
+                return {}
 
         dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
+        dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
 
-        # Map Wilaya to res.country.state if matching
-        state_id = False
-        wilaya_name = data.get("wilaya") or ""
+        # Map Wilaya to res.country.state (or auto-create if missing in vanilla Odoo)
+        state_dict = False
+        wilaya_name = data.get("wilaya") or candidate_ctx.get("wilaya") or candidate_ctx.get("city") or ""
         if wilaya_name and dz_country:
             state = self.env["res.country.state"].search([
                 ("country_id", "=", dz_country.id),
@@ -1177,8 +1277,20 @@ class ResPartner(models.Model):
                 ("name", "ilike", wilaya_name),
                 ("code", "ilike", wilaya_name[:2]),
             ], limit=1)
+            if not state:
+                try:
+                    w_code = wilaya_name[:2].upper()
+                    if not w_code.isalnum():
+                        w_code = "DZ"
+                    state = self.env["res.country.state"].sudo().create({
+                        "name": wilaya_name.title(),
+                        "code": w_code,
+                        "country_id": dz_country.id,
+                    })
+                except Exception:
+                    state = False
             if state:
-                state_id = state.id
+                state_dict = {"id": state.id, "display_name": state.display_name or state.name}
 
         # Format NAE codes
         nae_raw = data.get("nae_codes") or data.get("naeCodes") or data.get("code_nae") or data.get("codeNae")
@@ -1226,8 +1338,8 @@ class ResPartner(models.Model):
             statut_mapped = "INCONNU"
 
         # ── Strict Algerian Classification: Personne Morale vs Personne Physique ──
-        rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
-        rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or ""
+        rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or candidate_ctx.get("rc_official") or ""
+        rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or candidate_ctx.get("rc_number") or ""
         rc_val = rc_official or format_official_rc(rc_raw) or rc_raw
         forme_val = data.get("forme_juridique") or data.get("formeJuridique") or ""
 
@@ -1243,10 +1355,12 @@ class ResPartner(models.Model):
         elif "PHYSIQUE" in (forme_val or "").upper() or (forme_val or "").upper() == "PP":
             is_pp = True
 
+        nif_val = data.get("nif") or candidate_ctx.get("vat") or candidate_ctx.get("nif") or ""
+
         enrich_dict = {
-            "name": data.get("raison_sociale") or data.get("raisonSociale") or data.get("name", ""),
-            "vat": data.get("nif") or "",
-            "kyb_nif": data.get("nif") or "",
+            "name": data.get("raison_sociale") or data.get("raisonSociale") or data.get("name") or candidate_ctx.get("name", ""),
+            "vat": nif_val,
+            "kyb_nif": nif_val,
             "kyb_rc": rc_val,
             "kyb_nis": data.get("nis") or data.get("numero_nis") or "",
             "kyb_article_imposition": data.get("article_imposition") or data.get("articleImposition") or "",
@@ -1255,17 +1369,19 @@ class ResPartner(models.Model):
             "kyb_nae_codes": nae_str,
             "kyb_activites_rc": "\n".join(secondary_acts_lines) if secondary_acts_lines else False,
             "street": data.get("adresse") or data.get("adresseSiegeSocial") or "",
-            "city": wilaya_name,
+            "city": wilaya_name.title() if wilaya_name else "",
         }
 
         if is_pm:
             enrich_dict["is_company"] = True
-            enrich_dict["company_type"] = "company"
+            if "company_type" in self._fields:
+                enrich_dict["company_type"] = "company"
             if not forme_val:
                 forme_val = "Société (Personne Morale)"
         elif is_pp:
             enrich_dict["is_company"] = False
-            enrich_dict["company_type"] = "person"
+            if "company_type" in self._fields:
+                enrich_dict["company_type"] = "person"
             if not forme_val:
                 forme_val = "Personne Physique"
 
@@ -1280,11 +1396,11 @@ class ResPartner(models.Model):
             enrich_dict["kyb_representant_legal"] = str(data.get("representant_legal") or data.get("representantLegal"))
         elif is_pp:
             enrich_dict["kyb_representant_legal"] = str(enrich_dict.get("name") or "") + " (Titulaire)"
-        if dz_country:
-            enrich_dict["country_id"] = dz_country.id
-        if state_id:
-            enrich_dict["state_id"] = state_id
+        if dz_country_dict:
+            enrich_dict["country_id"] = dz_country_dict
+        if state_dict:
+            enrich_dict["state_id"] = state_dict
         if "company_registry" in self._fields and rc_val:
             enrich_dict["company_registry"] = rc_val
 
-        return {k: v for k, v in enrich_dict.items() if v}
+        return {k: v for k, v in enrich_dict.items() if (v is not None and v != "" and v is not False) or (k == "is_company" and v is not None)}

@@ -683,7 +683,7 @@ class ResPartner(models.Model):
             return
         return self._do_kyb_resolve(cleaned)
 
-    @api.onchange("kyb_rc", "conforme_rc", "company_registry")
+    @api.onchange("kyb_rc", "conforme_rc")
     def _onchange_kyb_rc(self):
         """
         When the user enters or modifies the RC field, query the KYB API
@@ -1383,8 +1383,6 @@ class ResPartner(models.Model):
             "kyb_nis": data.get("nis") or data.get("numero_nis") or "",
             "kyb_article_imposition": data.get("article_imposition") or data.get("articleImposition") or "",
             "kyb_statut_cnrc": statut_mapped,
-            "kyb_date_radiation": str(data.get("date_radiation") or data.get("dateRadiation"))[:10] if (data.get("date_radiation") or data.get("dateRadiation")) else False,
-            "kyb_date_creation": str(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))[:10] if (data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")) else False,
             "kyb_activite": primary_formatted,
             "kyb_nae_codes": nae_str,
             "kyb_activites_rc": "\n".join(secondary_acts_lines) if secondary_acts_lines else False,

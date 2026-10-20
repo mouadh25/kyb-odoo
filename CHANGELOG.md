@@ -15,15 +15,26 @@ When deployed into an Odoo instance, the universal semantic version (`1.4.2`) ma
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.3` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.3` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.3` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.3` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.3` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.4` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.4` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.4` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+
+---
+
+## [1.4.4] - October 2026
+
+### Added: Date de Création & National Registry Wilaya 99 Support
+* **Date de Création / Immatriculation (`kyb_date_creation`):** Added official creation date field on `res.partner` and partner views, automatically synchronized from CNRC immatriculation date, displayed in the verification card, and tracked in Odoo chatter logs.
+* **National Registry (Wilaya 99 - Grandes Entreprises):** Expanded Décret 05-468 regex engines to support CNRC National Registries (e.g. NAFTAL, Sonatrach with prefix `99B` and `99/00-XXXXXXXB`), preventing rejection of national corporate identifiers.
+* **Décret 05-468 Hardening & Accurate Year Suffix:** Hardened `format_official_rc` to dynamically extract the registration year from `kyb_date_creation`, eliminating legacy wilaya duplication and ensuring strict compliance with Algerian official invoicing standards.
+* **Multilingual Localization:** Complete translations for creation date added to French (`Date de Création`), English (`Date of Creation`), and Arabic (`تاريخ التأسيس / القيد بالسجل التجاري`).
 
 ---
 
 ## [1.4.3] - October 2026
+
 
 ### Fixed: Native Autocomplete Selection & Counterparty Legal Enrichment
 * **Partner Autocomplete Deep Enrichment:** Resolved issue where selecting a suggested counterparty from Odoo's native `partner_autocomplete` dropdown did not populate legal fiscal fields. Both candidate selection and interactive `_onchange_kyb_rc` now reliably populate Raison Sociale, NIF (VAT), Trade Register (RC), Statistical Number (NIS), Share Capital, and Legal Address.

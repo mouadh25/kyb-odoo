@@ -27,12 +27,12 @@ except ImportError:
 _logger = logging.getLogger(__name__)
 
 # ──────────────── Official Algerian RC (Décret 05-468 & 18-112) Utilities ────────────────
-OFFICIAL_RC_REGEX = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|[0-9])/00-(\d{1,10})([ABCDabcd])(\d{2})$')
-COMPRESSED_RC_REGEX = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|[0-9])([ABCDabcd])(\d{1,10})$')
-SPACED_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|[0-9])\s*[-/ ]?\s*([ABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
-SPACED_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([ABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
-ARABIC_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|[0-9])\s*[-/ ]?\s*([أابجدABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
-ARABIC_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([أابجدABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
+OFFICIAL_RC_REGEX = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])/00-(\d{1,10})([ABCDabcd])(\d{2})?$')
+COMPRESSED_RC_REGEX = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])([ABCDabcd])(\d{1,10})$')
+SPACED_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[-/ ]?\s*([ABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
+SPACED_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([ABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
+ARABIC_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[-/ ]?\s*([أابجدABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
+ARABIC_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([أابجدABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
 ARABIC_TO_LATIN_CATEGORY = {'أ': 'A', 'ا': 'A', 'ب': 'B', 'ج': 'C', 'د': 'D'}
 
 def parse_algerian_rc(raw: Optional[str]) -> Optional[dict]:
@@ -71,7 +71,7 @@ def parse_algerian_rc(raw: Optional[str]) -> Optional[dict]:
         return None
     try:
         w_num = int(wilaya)
-        if w_num < 0 or w_num > 69:
+        if w_num != 99 and (w_num < 0 or w_num > 69):
             return None
     except ValueError:
         return None
@@ -91,16 +91,17 @@ def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) 
     p = parse_algerian_rc(raw)
     if not p:
         return None
-    if p['year']:
+    if p.get('year'):
         return p['official']
     y = ''
     if fallback_year:
         m = re.search(r'(\d{4}|\d{2})', str(fallback_year))
         if m:
             y = m.group(1)[-2:]
-    if not y:
-        y = p['wilaya']
-    return f"{p['wilaya']}/00-{p['register_number']}{p['category']}{y}"
+    if y:
+        return f"{p['wilaya']}/00-{p['register_number']}{p['category']}{y}"
+    return p['official']
+
 
 
 
@@ -428,6 +429,11 @@ class ResPartner(models.Model):
         tracking=True,
         help="Date officielle de radiation du registre de commerce (CNRC).",
     )
+    kyb_date_creation = fields.Date(
+        string="Date de Création",
+        tracking=True,
+        help="Date officielle de création / première immatriculation au registre de commerce (CNRC).",
+    )
     kyb_forme_juridique = fields.Char(
         string="Forme Juridique",
         tracking=True,
@@ -534,6 +540,8 @@ class ResPartner(models.Model):
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;">{partner.kyb_nis}</td></tr>')
             if partner.kyb_forme_juridique:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_forme_juridique}</td></tr>')
+            if partner.kyb_date_creation:
+                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Date de Création")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_date_creation}</td></tr>')
             if partner.kyb_capital_social:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
@@ -852,9 +860,13 @@ class ResPartner(models.Model):
             elif self.kyb_nif and not self.vat:
                 self.vat = self.kyb_nif
 
+            date_crea = data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")
+            if date_crea:
+                self.kyb_date_creation = str(date_crea)[:10]
+
             rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
             rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "") or ""
-            rc = rc_official or format_official_rc(rc_raw) or rc_raw
+            rc = format_official_rc(rc_official or rc_raw, self.kyb_date_creation) or rc_official or rc_raw
             if rc:
                 self.kyb_rc = rc
                 if "company_registry" in self._fields:
@@ -882,6 +894,10 @@ class ResPartner(models.Model):
                 self.kyb_date_radiation = str(date_rad)[:10]
             elif mapped_statut != "RADIE":
                 self.kyb_date_radiation = False
+
+            date_crea = data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")
+            if date_crea:
+                self.kyb_date_creation = str(date_crea)[:10]
 
             # ── Activités RC: Séparation Activité Principale & Activités Secondaires ──
             nae_raw = data.get("nae_codes") or data.get("naeCodes") or data.get("code_nae") or data.get("codeNae")
@@ -955,6 +971,7 @@ class ResPartner(models.Model):
                     "kyb_representant_legal": self.kyb_representant_legal,
                     "kyb_statut_cnrc": self.kyb_statut_cnrc,
                     "kyb_date_radiation": self.kyb_date_radiation,
+                    "kyb_date_creation": self.kyb_date_creation,
                     "kyb_activite": self.kyb_activite,
                     "kyb_nae_codes": self.kyb_nae_codes,
                     "kyb_activites_rc": self.kyb_activites_rc,
@@ -967,7 +984,7 @@ class ResPartner(models.Model):
                 }
                 if "company_registry" in self._fields and self.company_registry:
                     write_vals["company_registry"] = self.company_registry
-                self.write({k: v for k, v in write_vals.items() if v is not False or k in ("kyb_date_radiation", "kyb_activites_rc")})
+                self.write({k: v for k, v in write_vals.items() if v is not False or k in ("kyb_date_radiation", "kyb_date_creation", "kyb_activites_rc")})
                 self._post_kyb_audit_log()
 
             # ── Duplicate Fiscal Identifier (NIF) Guard ──
@@ -1338,9 +1355,10 @@ class ResPartner(models.Model):
             statut_mapped = "INCONNU"
 
         # ── Strict Algerian Classification: Personne Morale vs Personne Physique ──
+        date_crea_val = str(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation") or "")[:10]
         rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or candidate_ctx.get("rc_official") or ""
         rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or candidate_ctx.get("rc_number") or ""
-        rc_val = rc_official or format_official_rc(rc_raw) or rc_raw
+        rc_val = format_official_rc(rc_official or rc_raw, date_crea_val) or rc_official or rc_raw
         forme_val = data.get("forme_juridique") or data.get("formeJuridique") or ""
 
         is_pm = False
@@ -1365,6 +1383,8 @@ class ResPartner(models.Model):
             "kyb_nis": data.get("nis") or data.get("numero_nis") or "",
             "kyb_article_imposition": data.get("article_imposition") or data.get("articleImposition") or "",
             "kyb_statut_cnrc": statut_mapped,
+            "kyb_date_radiation": str(data.get("date_radiation") or data.get("dateRadiation"))[:10] if (data.get("date_radiation") or data.get("dateRadiation")) else False,
+            "kyb_date_creation": str(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))[:10] if (data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")) else False,
             "kyb_activite": primary_formatted,
             "kyb_nae_codes": nae_str,
             "kyb_activites_rc": "\n".join(secondary_acts_lines) if secondary_acts_lines else False,

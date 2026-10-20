@@ -430,9 +430,9 @@ class ResPartner(models.Model):
         help="Date officielle de radiation du registre de commerce (CNRC).",
     )
     kyb_date_creation = fields.Date(
-        string="Date de Création",
+        string="Date d'Immatriculation",
         tracking=True,
-        help="Date officielle de création / première immatriculation au registre de commerce (CNRC).",
+        help="Date officielle de première immatriculation au registre de commerce (CNRC).",
     )
     kyb_forme_juridique = fields.Char(
         string="Forme Juridique",
@@ -541,7 +541,7 @@ class ResPartner(models.Model):
             if partner.kyb_forme_juridique:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_forme_juridique}</td></tr>')
             if partner.kyb_date_creation:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Date de Création")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_date_creation}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Date d\'Immatriculation")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_date_creation}</td></tr>')
             if partner.kyb_capital_social:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
@@ -599,6 +599,33 @@ class ResPartner(models.Model):
                             d_rad = ent.get("date_radiation") or ent.get("dateRadiation")
                             if d_rad:
                                 vals["kyb_date_radiation"] = str(d_rad)[:10]
+                        except Exception:
+                            pass
+            if not partner.kyb_date_creation:
+                if isinstance(data, dict):
+                    d_crea = (
+                        data.get("date_creation")
+                        or data.get("date_immatriculation")
+                        or data.get("dateImmatriculation")
+                        or data.get("dateCreation")
+                    )
+                    if d_crea:
+                        vals["kyb_date_creation"] = str(d_crea)[:10]
+                if not vals.get("kyb_date_creation"):
+                    query = partner.kyb_rc or partner.kyb_nif or partner.vat
+                    if query:
+                        try:
+                            client = _get_kyb_client(partner.env)
+                            prof = client.resolve(query)
+                            ent = prof.get("entity") or prof.get("data") or prof
+                            d_crea = (
+                                ent.get("date_creation")
+                                or ent.get("date_immatriculation")
+                                or ent.get("dateImmatriculation")
+                                or ent.get("dateCreation")
+                            )
+                            if d_crea:
+                                vals["kyb_date_creation"] = str(d_crea)[:10]
                         except Exception:
                             pass
             if vals:

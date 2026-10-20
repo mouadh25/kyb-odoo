@@ -174,7 +174,7 @@ class _NativeKybClient:
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Accept-Language": lang,
-            "User-Agent": f"Odoo-KYB-Connector/1.4.3 (Odoo {odoo_ver}; Sovereign)",
+            "User-Agent": f"Odoo-KYB-Connector/1.4.5 (Odoo {odoo_ver}; Sovereign)",
         })
         self.search = _NativeSearchNamespace(self)
         self._resolve_cache = {}  # {query_str: (timestamp, result_dict)}

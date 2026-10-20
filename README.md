@@ -144,11 +144,11 @@ For detailed release history, new features, bug fixes, and upgrade notes across 
 
 | Odoo Version | Module Version Code | Market Adoption & Tier | Multi-Language (i18n) | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Odoo 20.0** | `20.0.1.4.2` | Current Released Generation | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 19.0** | `19.0.1.4.2` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 18.0** | `18.0.1.4.2` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 17.0** | `17.0.1.4.2` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 16.0** | `16.0.1.4.2` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 20.0** | `20.0.1.4.5` | Current Released Generation | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 19.0** | `19.0.1.4.5` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 18.0** | `18.0.1.4.5` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 17.0** | `17.0.1.4.5` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 16.0** | `16.0.1.4.5` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
 
 ---
 

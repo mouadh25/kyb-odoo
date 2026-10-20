@@ -1,5 +1,5 @@
 # KYB — ERP Integrator & Administrator Technical Manual
-**Version:** `1.4.2` / `20.0.1.4.2`  
+**Version:** `1.4.5` / `20.0.1.4.5`  
 **Platform Domain:** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
 **Administration Portal:** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
 **Target Environments:** Odoo 16.0 LTS, 17.0, 18.0, 19.0, 20.0 (Community & Enterprise)  

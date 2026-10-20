@@ -11,15 +11,30 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) alongs
 
 The KYB connector maintains a unified, backwards-compatible codebase supporting Algerian corporate ERP deployments across supported Long-Term Support (LTS) foundations and modern release generations.
 
-When deployed into an Odoo instance, the universal semantic version (`1.4.2`) maps to the corresponding major version:
+When deployed into an Odoo instance, the universal semantic version (`1.4.5`) maps to the corresponding major version:
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.4` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.4` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.4` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.5` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.5` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.5` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.5` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.5` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+
+---
+
+## [1.4.5] - October 2026
+
+### Improved
+* **Official Registry Terminology ("Date d'Immatriculation"):** Standardized the counterparty registration date label to **Date d'Immatriculation** across partner forms and chatter audit trails to align strictly with official CNRC (Centre National du Registre du Commerce) terminology and Algerian commercial standards (Décret 05-468).
+* **Multi-Format Date Interpretation:** Enhanced registration date parsing supporting standard Algerian registry formats (ISO, DD/MM/YYYY, and registration year) with seamless localization.
+
+### Added
+* **Dual-Field ORM Compatibility Alias:** Added `kyb_date_immatriculation` as an alias alongside `kyb_date_creation`, ensuring zero-migration backward compatibility for custom reporting, third-party addons, and automated workflows.
+
+### Fixed
+* **Native Autocomplete Selection Stabilization:** Resolved a client-side interface error occurring during counterparty selection from Odoo's native autocomplete dropdown, ensuring smooth, instantaneous form population across all web client generations.
+* **Multi-Version Python Compatibility:** Reinforced syntax and runtime compatibility across Python 3.10, 3.11, and 3.12 environments supporting Odoo 16.0 LTS through Odoo 20.0.
 
 ---
 

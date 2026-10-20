@@ -1,5 +1,5 @@
 # KYB pour Odoo — Manuel Utilisateur & Guide Pratique
-**Version :** `1.4.2` / `20.0.1.4.2`  
+**Version :** `1.4.5` / `20.0.1.4.5`  
 **Cible :** Directeurs Financiers (DAF), Responsables Comptables, Gestionnaires Achats & Ventes  
 **Portail KYB (by Digidev) :** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
 **Compatibilité :** Odoo 16.0 LTS, 17.0, 18.0, 19.0, 20.0 (Community & Enterprise)

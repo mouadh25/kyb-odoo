@@ -542,7 +542,8 @@ class ResPartner(models.Model):
             if partner.kyb_forme_juridique:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_forme_juridique}</td></tr>')
             if partner.kyb_date_creation:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Date d\'Immatriculation")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_date_creation}</td></tr>')
+                label_immat = _("Date d'Immatriculation")
+                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{label_immat} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_date_creation}</td></tr>')
             if partner.kyb_capital_social:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:

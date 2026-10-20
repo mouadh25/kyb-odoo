@@ -475,6 +475,7 @@ class ResPartner(models.Model):
     conforme_statut_cnrc = fields.Selection(related="kyb_statut_cnrc", readonly=False, string="Statut CNRC (Alias)")
     conforme_activite = fields.Char(related="kyb_activite", readonly=False, string="Activité (Alias)")
     conforme_last_verified = fields.Datetime(related="kyb_last_verified", readonly=True, string="Dernière vérification (Alias)")
+    kyb_date_immatriculation = fields.Date(related="kyb_date_creation", readonly=False, string="Date d'Immatriculation (Alias)")
 
     # ──────────────── Action Buttons & Onchange Handlers ───────────
 

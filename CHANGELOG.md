@@ -25,13 +25,15 @@ When deployed into an Odoo instance, the universal semantic version (`1.4.2`) ma
 
 ## [1.4.4] - October 2026
 
-### Added: Date de Création & National Registry Wilaya 99 Support
-* **Date de Création / Immatriculation (`kyb_date_creation`):** Added official creation date field on `res.partner` and partner views, automatically synchronized from CNRC immatriculation date, displayed in the verification card, and tracked in Odoo chatter logs.
-* **National Registry (Wilaya 99 - Grandes Entreprises):** Expanded Décret 05-468 regex engines to support CNRC National Registries (e.g. NAFTAL, Sonatrach with prefix `99B` and `99/00-XXXXXXXB`), preventing rejection of national corporate identifiers.
-* **Décret 05-468 Hardening & Accurate Year Suffix:** Hardened `format_official_rc` to dynamically extract the registration year from `kyb_date_creation`, eliminating legacy wilaya duplication and ensuring strict compliance with Algerian official invoicing standards.
-* **Multilingual Localization:** Complete translations for creation date added to French (`Date de Création`), English (`Date of Creation`), and Arabic (`تاريخ التأسيس / القيد بالسجل التجاري`).
+### Added
+* **Creation Date Tracking (`kyb_date_creation`):** Added official establishment and registration date support for Algerian counterparties with multilingual localization (FR, EN, AR).
+* **National Registry Support (Wilaya 99):** Extended recognition for national commercial registrations and large enterprises (CNRC Central).
+
+### Improved
+* **Official RC Formatting (Décret 05-468):** Enhanced registration formatting with dynamic registration year derivation.
 
 ---
+
 
 ## [1.4.3] - October 2026
 

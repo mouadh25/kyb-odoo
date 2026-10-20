@@ -102,6 +102,31 @@ def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) 
         return f"{p['wilaya']}/00-{p['register_number']}{p['category']}{y}"
     return p['official']
 
+def _normalize_algerian_date(val: Optional[any]) -> Optional[str]:
+    """
+    Safely normalizes any date representation (ISO, slash DD/MM/YYYY, datetime, etc.)
+    into canonical 'YYYY-MM-DD' for Odoo fields.Date. Returns False if missing or unparseable.
+    """
+    if not val:
+        return False
+    if hasattr(val, "strftime"):
+        return val.strftime("%Y-%m-%d")
+    s = str(val).strip()
+    if not s or s.lower() in ("none", "null", "false", "n/a", "-"):
+        return False
+    m_iso = re.match(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
+    if m_iso:
+        y, m, d = m_iso.group(1), m_iso.group(2).zfill(2), m_iso.group(3).zfill(2)
+        return f"{y}-{m}-{d}"
+    m_fr = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})", s)
+    if m_fr:
+        d, m, y = m_fr.group(1).zfill(2), m_fr.group(2).zfill(2), m_fr.group(3)
+        return f"{y}-{m}-{d}"
+    m_year = re.match(r"^(\d{4})$", s)
+    if m_year:
+        return f"{m_year.group(1)}-01-01"
+    return False
+
 
 
 
@@ -589,8 +614,9 @@ class ResPartner(models.Model):
                 # Check data dictionary first to avoid any external network call
                 if isinstance(data, dict):
                     d_rad = data.get("date_radiation") or data.get("dateRadiation") or data.get("radiation_date")
-                    if d_rad:
-                        vals["kyb_date_radiation"] = str(d_rad)[:10]
+                    norm_rad = _normalize_algerian_date(d_rad)
+                    if norm_rad:
+                        vals["kyb_date_radiation"] = norm_rad
                 if not vals.get("kyb_date_radiation"):
                     query = partner.kyb_nif or partner.kyb_rc or partner.name
                     if query:
@@ -599,8 +625,9 @@ class ResPartner(models.Model):
                             prof = client.resolve(query)
                             ent = prof.get("entity") or prof.get("data") or prof
                             d_rad = ent.get("date_radiation") or ent.get("dateRadiation")
-                            if d_rad:
-                                vals["kyb_date_radiation"] = str(d_rad)[:10]
+                            norm_rad = _normalize_algerian_date(d_rad)
+                            if norm_rad:
+                                vals["kyb_date_radiation"] = norm_rad
                         except Exception:
                             pass
             if not partner.kyb_date_creation:
@@ -611,8 +638,9 @@ class ResPartner(models.Model):
                         or data.get("dateImmatriculation")
                         or data.get("dateCreation")
                     )
-                    if d_crea:
-                        vals["kyb_date_creation"] = str(d_crea)[:10]
+                    norm_crea = _normalize_algerian_date(d_crea)
+                    if norm_crea:
+                        vals["kyb_date_creation"] = norm_crea
                 if not vals.get("kyb_date_creation"):
                     query = partner.kyb_rc or partner.kyb_nif or partner.vat
                     if query:
@@ -626,8 +654,9 @@ class ResPartner(models.Model):
                                 or ent.get("dateImmatriculation")
                                 or ent.get("dateCreation")
                             )
-                            if d_crea:
-                                vals["kyb_date_creation"] = str(d_crea)[:10]
+                            norm_crea = _normalize_algerian_date(d_crea)
+                            if norm_crea:
+                                vals["kyb_date_creation"] = norm_crea
                         except Exception:
                             pass
             if vals:
@@ -890,8 +919,9 @@ class ResPartner(models.Model):
                 self.vat = self.kyb_nif
 
             date_crea = data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")
-            if date_crea:
-                self.kyb_date_creation = str(date_crea)[:10]
+            norm_crea = _normalize_algerian_date(date_crea)
+            if norm_crea:
+                self.kyb_date_creation = norm_crea
 
             rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
             rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "") or ""
@@ -919,14 +949,11 @@ class ResPartner(models.Model):
                 self.kyb_statut_cnrc = mapped_statut
 
             date_rad = data.get("date_radiation") or data.get("dateRadiation") or data.get("date_rad")
-            if date_rad:
-                self.kyb_date_radiation = str(date_rad)[:10]
+            norm_rad = _normalize_algerian_date(date_rad)
+            if norm_rad:
+                self.kyb_date_radiation = norm_rad
             elif mapped_statut != "RADIE":
                 self.kyb_date_radiation = False
-
-            date_crea = data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")
-            if date_crea:
-                self.kyb_date_creation = str(date_crea)[:10]
 
             # ── Activités RC: Séparation Activité Principale & Activités Secondaires ──
             nae_raw = data.get("nae_codes") or data.get("naeCodes") or data.get("code_nae") or data.get("codeNae")
@@ -1384,7 +1411,7 @@ class ResPartner(models.Model):
             statut_mapped = "INCONNU"
 
         # ── Strict Algerian Classification: Personne Morale vs Personne Physique ──
-        date_crea_val = str(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation") or "")[:10]
+        date_crea_val = _normalize_algerian_date(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))
         rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or candidate_ctx.get("rc_official") or ""
         rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or candidate_ctx.get("rc_number") or ""
         rc_val = format_official_rc(rc_official or rc_raw, date_crea_val) or rc_official or rc_raw

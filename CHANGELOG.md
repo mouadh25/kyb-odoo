@@ -15,11 +15,48 @@ When deployed into an Odoo instance, the universal semantic version (`1.4.5`) ma
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.5` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.5` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.5` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.5` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.5` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.1.4.6` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.1.4.6` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.1.4.6` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.1.4.6` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.1.4.6` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+
+---
+
+## [2.0.2] - 2026-10-22
+
+### Changed
+* **Chatter Audit Trail Wording Neutralization:**
+  Simplified the footer inscription on the partner chatter verification audit card from
+  `Consultation Registre CNRC · Algérie Télécom Sovereign Cloud · [Date]` to
+  `Consultation Registre Officiel · [Date]` across all Odoo editions (16.0–20.0).
+
+---
+
+## [2.0.1] - 2026-10-22
+
+### Fixed
+* **Odoo 20 Autocomplete `TypeError: value.toFormat is not a function`:**
+  Resolved a crash triggered when selecting a KYB candidate from the partner autocomplete
+  dropdown on Odoo 20.0. The root cause was that `kyb_date_creation` and `kyb_date_radiation`
+  (ISO string `"YYYY-MM-DD"` or Python `False`) were included in the autocomplete RPC return
+  payload. Odoo 20's web framework (`_formatServerValue` → `serializeDate`) expects Luxon
+  DateTime objects for `fields.Date` values in onchange payloads, not raw strings or booleans.
+  **Fix:** Both date fields are now explicitly excluded from `ALWAYS_SYNC_FIELDS` and blocked
+  via `_AUTOCOMPLETE_DATE_EXCLUDE` in the autocomplete return path. Dates are written correctly
+  by the server-side `write()` path in `action_verify_kyb_sheet`, which bypasses the client-side
+  Luxon serialization layer. No functional regression: dates are still fully populated on the
+  **Vérifier Fiche KYB** enrichment button click (all Odoo 16–20). Zero DDL changes.
+
+---
+
+## [1.4.6] - October 2026
+
+### Fixed
+* **Date Synchronization & Candidate Switching:** Resolved an issue where rapidly switching counterparty candidates in autocomplete retained stale establishment dates from previously selected candidates, causing inverted date sequences. Both `kyb_date_creation` and `kyb_date_radiation` are now synchronically bound to the newly selected candidate with defensive chronological invariants (`immatriculation <= radiation`).
+* **Radiation Date Visibility in Chatter:** Added official `Date de Radiation` display to the institutional chatter audit card for deregistered (radié) counterparties.
+* **Algerian Administrative Address Decomposition (Commune vs Wilaya):** Implemented authoritative address decomposition (`_split_algerian_commune_wilaya`) parsing CNRC dual-column formats (`COMMUNE/WILAYA`, e.g. `IBN ZIAD/CONSTANTINE`). Counterparties registered in peripheral CNRC antennae now correctly map to their sovereign Wilaya state (e.g. State 25 - Constantine) without polluting city and address fields.
+* **Institutional Monochromatic Card Design:** Aligned chatter audit cards with Law 25-11 institutional White & Zinc typography tokens (eliminating AI blue-purple artifacts and lateral border accents).
 
 ---
 

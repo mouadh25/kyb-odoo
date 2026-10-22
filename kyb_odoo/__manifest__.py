@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 {
     "name": "KYB — Algerian Corporate Identity & Temporal Fiscal Compliance",
-    "version": "20.0.1.4.5",
+    "version": "16.0.2.0.2",
     "category": "Accounting/Localisation",
-    "summary": "Instant NIF/RC verification (<10ms), temporal strike-off audit (CIDTA Art. 176), and auto-completion for Algerian counterparties.",
+    "summary": "Instant NIF/RC verification (<10ms), temporal strike-off audit (CIDTA Art. 176), autonomous 1-click update engine, and enterprise fleet telemetry.",
     "description": """
-KYB Sovereign Corporate Identity & Fiscal Verification Connector
-=================================================================
+KYB Sovereign Corporate Identity & Fiscal Verification Connector (v2.0.0)
+========================================================================
 
 Integrates the **KYB sovereign corporate identity, registry intelligence, and temporal evidence API**
 (hosted at the Algérie Télécom Sovereign Cloud Datacenter, compliant with Law 18-07 / 25-11)
 directly into Odoo's partner management and invoicing workflows.
 
-Key Features
-------------
+Key Features (Version 2.0 Major Leap)
+-------------------------------------
+* **Autonomous Remote Upgrade Engine**: In-app 1-click updates and automated patch synchronization directly from the sovereign gateway without manual server access.
+* **Enterprise Fleet Telemetry (Loi 25-11)**: Sovereign, zero-PII diagnostic heartbeat reporting compliance distribution, module footprint, and security posture to central administrative cockpit.
 * **Instant NIF & RC Auto-Completion (<10ms)**: Typing an Algerian Tax Identification Number (NIF) or Trade Registry (RC) into ``res.partner`` instantly auto-populates Raison Sociale, registered legal address, share capital, NIS, and Article d'Imposition.
 * **Temporal Status Audit (CIDTA Art. 176 & CTCA Art. 30)**: Validates supplier registration standing at the exact date of the invoice, preventing VAT deduction disallowance on deregistered (radié) suppliers.
 * **Real-time Name Autocomplete**: Overrides ``res.partner._name_search`` to query KYB's pre-indexed fuzzy search engine, providing instant autocomplete in many2one partner dropdowns.

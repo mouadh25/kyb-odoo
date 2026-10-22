@@ -59,6 +59,31 @@
                             </div>
                         </setting>
 
+                        <setting string="Mises à Jour &amp; Télémétrie de la Flotte" help="Contrôle de version, télémétrie institutionnelle (Loi 25-11) et mise à jour en 1 clic.">
+                            <div class="content-group">
+                                <div class="row mt4">
+                                    <label for="kyb_installed_version" class="col-lg-4 o_light_label" string="Version Installée"/>
+                                    <field name="kyb_installed_version" readonly="1" class="col-lg-8"/>
+                                </div>
+                                <div class="row mt4">
+                                    <label for="kyb_latest_version" class="col-lg-4 o_light_label" string="Dernière Version Disponible"/>
+                                    <field name="kyb_latest_version" readonly="1" class="col-lg-8"/>
+                                </div>
+                                <div class="row mt4">
+                                    <label for="kyb_last_telemetry_sync" class="col-lg-4 o_light_label" string="Dernière Télémétrie"/>
+                                    <field name="kyb_last_telemetry_sync" readonly="1" class="col-lg-8"/>
+                                </div>
+                                <div class="mt16 d-flex gap-2">
+                                    <button name="action_check_kyb_update" type="object" string="Vérifier les Mises à Jour" class="btn btn-secondary btn-sm" icon="fa-refresh"/>
+                                    <button name="action_upgrade_kyb_module" type="object" string="Mettre à jour maintenant (1-Clic)" class="btn btn-primary btn-sm ms-2" icon="fa-download" confirm="Cette action va télécharger la version certifiée et actualiser le module KYB. Confirmez-vous ?"/>
+                                </div>
+                                <div class="mt16">
+                                    <field name="kyb_auto_update_patches" class="oe_inline"/>
+                                    <label for="kyb_auto_update_patches" string="Mise à jour automatique des correctifs mineurs" class="oe_inline ms-2"/>
+                                </div>
+                            </div>
+                        </setting>
+
                         <!-- Sovereign Legal Framework callout cleanly located in Settings -->
                         <div class="alert alert-secondary mt-3 p-3 rounded" role="status">
                             <div class="d-flex align-items-center">

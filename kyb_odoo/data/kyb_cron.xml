@@ -11,5 +11,15 @@
             <field name="interval_type">months</field>
             <field name="active" eval="True"/>
         </record>
+        <!-- ─────────────── Scheduled Action: Telemetry & Update Check ─────────────── -->
+        <record id="ir_cron_kyb_telemetry_sync" model="ir.cron">
+            <field name="name">KYB: Client Telemetry Sync &amp; Update Check</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_kyb_sync_telemetry()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>

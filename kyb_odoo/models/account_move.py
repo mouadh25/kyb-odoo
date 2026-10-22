@@ -211,7 +211,7 @@ class AccountMove(models.Model):
                 self.kyb_tax_deductible = False
                 self.kyb_audit_date = fields.Datetime.now()
                 self.kyb_compliance_message = (
-                    f"⚠️ Signalement Registre CNRC (Fournisseur Radié) :\n"
+                    f"⚠️ Signalement Registre Officiel (Fournisseur Radié) :\n"
                     f"Le fournisseur '{partner.name}' est enregistré comme radié depuis le {rad_date}.\n"
                     f"La présente facture est datée du {inv_date} (postérieurement à la date de radiation enregistrée).\n"
                     f"Information : Selon les dispositions des Art. 169 & 176 CIDTA et Art. 30 CTCA, une vérification comptable préalable est recommandée."
@@ -221,7 +221,7 @@ class AccountMove(models.Model):
                 self.kyb_tax_deductible = False
                 self.kyb_audit_date = fields.Datetime.now()
                 self.kyb_compliance_message = (
-                    f"⚠️ Fournisseur Signalé Radié (Registre CNRC) :\n"
+                    f"⚠️ Fournisseur Signalé Radié (Registre Officiel) :\n"
                     f"Le partenaire '{partner.name}' est enregistré comme radié (Date radiation : {rad_date or 'Non renseignée'}).\n"
                     f"Veuillez vérifier la situation auprès de vos services comptables."
                 )
@@ -276,7 +276,7 @@ class AccountMove(models.Model):
                             raise UserError(
                                 _("⛔ COMPTABILISATION INTERROMPUE (Contrôle Registre KYB)\n\n"
                                   "Réglementation applicable : Articles 169 & 176 du CIDTA et Article 30 du CTCA.\n\n"
-                                  "Le fournisseur '%(partner)s' est enregistré comme radié au registre du commerce (CNRC) en date du %(rad_date)s.\n"
+                                  "Le fournisseur '%(partner)s' est enregistré comme radié au registre officiel en date du %(rad_date)s.\n"
                                   "La facture %(move_name)s est datée du %(inv_date)s (postérieurement à la date de radiation enregistrée).\n\n"
                                   "Recommandation de contrôle :\n"
                                   "• Selon la réglementation fiscale, les transactions conclues avec un fournisseur radié font l'objet d'un contrôle de déductibilité.\n"
@@ -293,7 +293,7 @@ class AccountMove(models.Model):
                             move.message_post(
                                 body=(
                                     f"<div class='alert alert-danger'>"
-                                    f"<strong>Signalement Registre CNRC (Fournisseur Radié - Réf. Art. 176 CIDTA) :</strong><br/>"
+                                    f"<strong>Signalement Registre Officiel (Fournisseur Radié - Réf. Art. 176 CIDTA) :</strong><br/>"
                                     f"{move.kyb_compliance_message}"
                                     f"</div>"
                                 ),

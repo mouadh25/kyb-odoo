@@ -1,5 +1,5 @@
 # KYB — ERP Integrator & Administrator Technical Manual
-**Version:** `1.4.5` / `20.0.1.4.5`  
+**Version:** `2.0.0` / `20.0.2.0.0`  
 **Platform Domain:** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
 **Administration Portal:** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
 **Target Environments:** Odoo 16.0 LTS, 17.0, 18.0, 19.0, 20.0 (Community & Enterprise)  
@@ -130,6 +130,34 @@ Navigate to **Invoicing (or Contacts) → Configuration → Settings → KYB Sov
 
 ![KYB Settings Configuration](screenshots/step03_settings_kyb_configuration.png)
 *Figure 7: Complete KYB Sovereign Verification settings panel in Odoo 20.*
+
+### D. Autonomous In-App Upgrade Engine & Centralized Release Distribution (Engine v2.0.0)
+Version 2.0.0 eliminates manual CLI and SSH deployment cycles by introducing an institutional in-app upgrade pipeline:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Odoo Admin Interface                             │
+│                     (Settings → KYB Compliance)                             │
+│                                                                             │
+│  [ Vérifier les mises à jour ] ───────► GET /api/v1/version                 │
+│                                              │                              │
+│  [ Mettre à jour maintenant  ] ───────► GET /api/v1/downloads/kyb_odoo.zip  │
+│               │                                                             │
+│               ▼                                                             │
+│     1. Pre-delete target files (os.remove to prevent POSIX uid collision)   │
+│     2. Extract release archive to /mnt/extra-addons/kyb_odoo                │
+│     3. Trigger ir.module.module.button_immediate_upgrade()                  │
+│     4. Zero data loss: Preserves 100% of kyb_rc, kyb_nif, & API credentials  │
+│     5. Redirect to /web (Instant Registry Reload)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Version Detection Gate (`action_check_kyb_update`):** Interrogates `GET /api/v1/version?client=odoo&version=...` to compare installed build against the Gateway's certified release. Normalizes versions (`^\d+\.0\.` stripping) to ensure deterministic Semver comparisons across all Odoo forks.
+2. **Atomic Distribution Download:** Fetches the certified archive directly from `GET /api/v1/downloads/kyb_odoo.zip`.
+3. **POSIX Safe Replacement:** Removes existing files prior to unpacking to prevent `PermissionError: [Errno 13]` when running under non-root container user (`odoo:odoo`).
+4. **Immediate In-Band ORM Upgrade:** Calls `ir.module.module.button_immediate_upgrade()`, applying DDL updates and reloading models in PostgreSQL without requiring server reboots or container restarts.
+5. **Scheduled Background Patching (`ir_cron_kyb_telemetry_sync`):** When `kyb.auto_update_patches = True`, urgent regulatory patches are pulled and applied automatically during nightly syncs.
+6. **Loi 25-11 Telemetry Ingestion:** Heartbeats transmit 7-dimension instance telemetry to `POST /api/v1/client/telemetry` (aggregate counters only; zero PII, zero customer/vendor names, zero invoice data).
 
 ---
 

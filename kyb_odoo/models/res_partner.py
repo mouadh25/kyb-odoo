@@ -14,7 +14,7 @@ This module extends ``res.partner`` with:
 
 import logging
 import re
-from typing import Optional
+from typing import Optional, Tuple
 
 import requests
 from odoo import api, fields, models, _
@@ -126,10 +126,103 @@ def _normalize_algerian_date(val: Optional[any]) -> Optional[str]:
     if m_year:
         return f"{m_year.group(1)}-01-01"
     return False
+ 
+ 
+ALGERIAN_WILAYAS_69 = {
+    "01": "Adrar", "02": "Chlef", "03": "Laghouat", "04": "Oum El Bouaghi",
+    "05": "Batna", "06": "Béjaïa", "07": "Biskra", "08": "Béchar",
+    "09": "Blida", "10": "Bouira", "11": "Tamanrasset", "12": "Tébessa",
+    "13": "Tlemcen", "14": "Tiaret", "15": "Tizi Ouzou", "16": "Alger",
+    "17": "Djelfa", "18": "Jijel", "19": "Sétif", "20": "Saïda",
+    "21": "Skikda", "22": "Sidi Bel Abbès", "23": "Annaba", "24": "Guelma",
+    "25": "Constantine", "26": "Médéa", "27": "Mostaganem", "28": "M'Sila",
+    "29": "Mascara", "30": "Ouargla", "31": "Oran", "32": "El Bayadh",
+    "33": "Illizi", "34": "Bordj Bou Arréridj", "35": "Boumerdès",
+    "36": "El Tarf", "37": "Tindouf", "38": "Tissemsilt", "39": "El Oued",
+    "40": "Khenchela", "41": "Souk Ahras", "42": "Tipaza", "43": "Mila",
+    "44": "Aïn Defla", "45": "Naâma", "46": "Aïn Témouchent", "47": "Ghardaïa",
+    "48": "Relizane", "49": "Timimoun", "50": "Bordj Badji Mokhtar",
+    "51": "Ouled Djellal", "52": "Béni Abbès", "53": "In Salah",
+    "54": "In Guezzam", "55": "Touggourt", "56": "Djanet",
+    "57": "El M'Ghair", "58": "El Meniaa",
+    "59": "Aflou", "60": "Barika", "61": "El Kantara", "62": "Bir El Ater",
+    "63": "El Aricha", "64": "Ksar Chellala", "65": "Aïn Oussara",
+    "66": "Messaad", "67": "Ksar El Boukhari", "68": "Bou Saâda",
+    "69": "El Abiodh Sidi Cheikh",
+}
 
+_NORM_WILAYA_TO_CODE = {}
+for code, name in ALGERIAN_WILAYAS_69.items():
+    clean_k = re.sub(r"[^a-z0-9]", "", name.lower())
+    _NORM_WILAYA_TO_CODE[clean_k] = code
+    unaccented = (
+        name.lower()
+        .replace("é", "e")
+        .replace("è", "e")
+        .replace("ï", "i")
+        .replace("â", "a")
+    )
+    _NORM_WILAYA_TO_CODE[re.sub(r"[^a-z0-9]", "", unaccented)] = code
 
+def _split_algerian_commune_wilaya(raw_str: Optional[str]) -> Tuple[str, str, str]:
+    """
+    Decomposes any Algerian administrative address or wilaya string into:
+    (commune, wilaya, wilaya_code).
+    Handles:
+    - CNRC dual column format: 'IBN ZIAD/CONSTANTINE' -> ('Ibn Ziad', 'Constantine', '25')
+    - Duplicate dual column: 'CONSTANTINE/CONSTANTINE' -> ('', 'Constantine', '25')
+    - Code dash format: '25 - Constantine' -> ('', 'Constantine', '25')
+    - Bare wilaya name: 'Constantine' -> ('', 'Constantine', '25')
+    """
+    if not raw_str or not isinstance(raw_str, str):
+        return ("", "", "")
+    s = raw_str.strip()
+    if not s or s.lower() in ("none", "null", "false", "-", "n/a"):
+        return ("", "", "")
 
+    raw_commune = ""
+    raw_wilaya = ""
 
+    if "/" in s:
+        parts = [p.strip() for p in s.split("/") if p.strip()]
+        if len(parts) >= 2:
+            raw_commune = parts[0]
+            raw_wilaya = parts[-1]
+        elif len(parts) == 1:
+            raw_wilaya = parts[0]
+    else:
+        m_dash = re.match(r"^(\d{1,2})\s*[-:]\s*(.+)$", s)
+        if m_dash:
+            code_candidate = m_dash.group(1).zfill(2)
+            name_candidate = m_dash.group(2).strip()
+            if code_candidate in ALGERIAN_WILAYAS_69:
+                return ("", ALGERIAN_WILAYAS_69[code_candidate], code_candidate)
+            raw_wilaya = name_candidate
+        else:
+            raw_wilaya = s
+
+    # Match raw_wilaya to canonical 69 Wilayas
+    wilaya_clean = raw_wilaya.strip().title()
+    wilaya_code = ""
+
+    m_num = re.match(r"^(\d{1,2})\b", raw_wilaya.strip())
+    if m_num and m_num.group(1).zfill(2) in ALGERIAN_WILAYAS_69:
+        wilaya_code = m_num.group(1).zfill(2)
+        wilaya_clean = ALGERIAN_WILAYAS_69[wilaya_code]
+    else:
+        norm_key = re.sub(r"[^a-z0-9]", "", raw_wilaya.lower())
+        if norm_key in _NORM_WILAYA_TO_CODE:
+            wilaya_code = _NORM_WILAYA_TO_CODE[norm_key]
+            wilaya_clean = ALGERIAN_WILAYAS_69[wilaya_code]
+
+    # Clean commune
+    commune_clean = raw_commune.strip().title()
+    if commune_clean.lower() == wilaya_clean.lower():
+        commune_clean = ""
+
+    return (commune_clean, wilaya_clean, wilaya_code)
+ 
+ 
 class _NativeSearchNamespace:
     """Namespace mirroring the official SDK search capabilities."""
 
@@ -143,6 +236,62 @@ class _NativeSearchNamespace:
         if isinstance(res, list):
             return res
         return []
+
+def _get_config_param(env, key, default=""):
+    """Universally get string config parameter across Odoo 16, 17, 18, 19, and 20."""
+    try:
+        icp = env["ir.config_parameter"].sudo()
+        if hasattr(icp, "get_str"):
+            val = icp.get_str(key, default=None)
+            return val if val is not None else default
+        if hasattr(icp, "get_param"):
+            return icp.get_param(key, default=default)
+        if hasattr(icp, "_get"):
+            val = icp._get(key)
+            return val if val is not None else default
+        rec = icp.search([("key", "=", key)], limit=1)
+        return rec.value if rec and rec.value is not None else default
+    except Exception:
+        return default
+
+
+def _get_config_bool(env, key, default=True):
+    """Universally get boolean config parameter across Odoo 16, 17, 18, 19, and 20."""
+    try:
+        icp = env["ir.config_parameter"].sudo()
+        if hasattr(icp, "get_bool"):
+            return icp.get_bool(key, default)
+        if hasattr(icp, "get_param"):
+            val = icp.get_param(key, default=str(default))
+            return val == "True" if isinstance(val, str) else bool(val)
+        if hasattr(icp, "_get"):
+            val = icp._get(key)
+            if val is None:
+                return default
+            return val in ("True", "1", True)
+        return default
+    except Exception:
+        return default
+
+
+def _set_config_param(env, key, value):
+    """Universally set string config parameter across Odoo 16, 17, 18, 19, and 20."""
+    try:
+        icp = env["ir.config_parameter"].sudo()
+        str_val = str(value) if value is not None else ""
+        if hasattr(icp, "set_str"):
+            return icp.set_str(key, str_val)
+        if hasattr(icp, "set_param"):
+            return icp.set_param(key, str_val)
+        if hasattr(icp, "_set"):
+            return icp._set(key, str_val)
+        rec = icp.search([("key", "=", key)], limit=1)
+        if rec:
+            rec.value = str_val
+        else:
+            icp.create({"key": key, "value": str_val})
+    except Exception:
+        pass
 
 
 class _NativeKybClient:
@@ -158,6 +307,7 @@ class _NativeKybClient:
         base_url: str = "https://kyb.digidevagency.dz",
         timeout: float = 35.0,
         lang: str = "fr",
+        env=None,
     ):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -169,13 +319,41 @@ class _NativeKybClient:
             odoo_ver = getattr(odoo.release, "version", "unknown")
         except Exception:
             odoo_ver = "unknown"
-        self._session.headers.update({
+
+        mod_ver = "2.0.0"
+        if env is not None:
+            try:
+                mod = env["ir.module.module"].sudo().search([("name", "=", "kyb_odoo")], limit=1)
+                if mod and mod.installed_version:
+                    mod_ver = mod.installed_version
+            except Exception:
+                pass
+
+        headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Accept-Language": lang,
-            "User-Agent": f"Odoo-KYB-Connector/1.4.5 (Odoo {odoo_ver}; Sovereign)",
-        })
+            "User-Agent": f"Odoo-KYB-Connector/{mod_ver} (Odoo {odoo_ver}; Sovereign)",
+            "X-KYB-Client-Type": "odoo",
+            "X-KYB-Client-Version": mod_ver,
+            "X-KYB-Odoo-Version": str(odoo_ver),
+        }
+        if env is not None:
+            try:
+                db_uuid = _get_config_param(env, "database.uuid")
+                db_name = env.cr.dbname
+                web_url = _get_config_param(env, "web.base.url")
+                if db_uuid:
+                    headers["X-KYB-Database-UUID"] = str(db_uuid)
+                if db_name:
+                    headers["X-KYB-Database-Name"] = str(db_name)
+                if web_url:
+                    headers["X-KYB-Base-URL"] = str(web_url)
+            except Exception:
+                pass
+
+        self._session.headers.update(headers)
         self.search = _NativeSearchNamespace(self)
         self._resolve_cache = {}  # {query_str: (timestamp, result_dict)}
         self._candidates_cache = {}  # {cache_key: (timestamp, result_dict)}
@@ -309,46 +487,6 @@ class _NativeKybClient:
 _CLIENT_CACHE: dict = {}
 
 
-def _get_config_param(env, key, default=""):
-    """Universally get string config parameter across Odoo 16, 17, 18, 19, and 20."""
-    icp = env["ir.config_parameter"].sudo()
-    if hasattr(icp, "get_param"):
-        return icp.get_param(key, default=default)
-    if hasattr(icp, "get_str"):
-        return icp.get_str(key, default=default)
-    if hasattr(icp, "_get"):
-        val = icp._get(key)
-        return val if val is not None else default
-    return default
-
-
-def _get_config_bool(env, key, default=True):
-    """Universally get boolean config parameter across Odoo 16, 17, 18, 19, and 20."""
-    icp = env["ir.config_parameter"].sudo()
-    if hasattr(icp, "get_bool"):
-        return icp.get_bool(key, default)
-    if hasattr(icp, "get_param"):
-        val = icp.get_param(key, default=str(default))
-        return val == "True" if isinstance(val, str) else bool(val)
-    if hasattr(icp, "_get"):
-        val = icp._get(key)
-        if val is None:
-            return default
-        return val in ("True", "1", True)
-def _set_config_param(env, key, value):
-    """Universally set string config parameter across Odoo 16, 17, 18, 19, and 20."""
-    icp = env["ir.config_parameter"].sudo()
-    if hasattr(icp, "set_str"):
-        return icp.set_str(key, str(value))
-    if hasattr(icp, "set_param"):
-        return icp.set_param(key, str(value))
-    if hasattr(icp, "_set"):
-        return icp._set(key, str(value))
-    rec = icp.search([("key", "=", key)], limit=1)
-    if rec:
-        rec.value = str(value)
-    else:
-        icp.create({"key": key, "value": str(value)})
 
 
 def _get_kyb_client(env):
@@ -396,7 +534,7 @@ def _get_kyb_client(env):
         timeout_val = 35.0
 
     client = _NativeKybClient(
-        api_key=api_key, base_url=base_url, timeout=timeout_val, lang=lang_code
+        api_key=api_key, base_url=base_url, timeout=timeout_val, lang=lang_code, env=env
     )
     try:
         client.warmup()
@@ -532,6 +670,41 @@ class ResPartner(models.Model):
                     vals["company_registry"] = fmt_rc
         return super().write(vals)
 
+    @api.constrains("kyb_nif", "vat")
+    def _check_duplicate_nif(self):
+        """Enforces duplicate NIF governance according to kyb.duplicate_nif_policy."""
+        policy = _get_config_param(self.env, "kyb.duplicate_nif_policy", "warn")
+        if policy == "allow":
+            return
+
+        for record in self:
+            nif = (record.kyb_nif or record.vat or "").strip()
+            # Ignore empty NIFs, non-digits, short strings, and sandbox deterministic test NIFs
+            if not nif or len(nif) < 9 or nif.startswith("0000"):
+                continue
+
+            domain = [
+                ("id", "!=", record.id),
+                "|",
+                ("kyb_nif", "=", nif),
+                ("vat", "=", nif),
+            ]
+            duplicate = self.search(domain, limit=1)
+            if duplicate:
+                if policy == "block":
+                    raise UserError(
+                        _(
+                            "Conformité Fiscale KYB : Un autre partenaire ('%(dup_name)s') possède déjà ce Numéro d'Identification Fiscale (NIF: %(nif)s). "
+                            "La création ou modification de doublons fiscaux est strictement bloquée par votre politique d'entreprise."
+                        )
+                        % {"dup_name": duplicate.name, "nif": nif}
+                    )
+                elif policy == "warn":
+                    msg = _(
+                        "⚠️ Avertissement Doublon Fiscal : Le NIF '%(nif)s' est déjà attribué au partenaire '%(dup_name)s' (ID: %(dup_id)s)."
+                    ) % {"nif": nif, "dup_name": duplicate.name, "dup_id": duplicate.id}
+                    record.message_post(body=msg)
+
     def _post_kyb_audit_log(self):
         """
         Posts an institutional KYB audit card to the record chatter.
@@ -557,44 +730,47 @@ class ResPartner(models.Model):
 
             rows = []
             if partner.name:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b; width: 38%;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #1e293b;">{partner.name}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; width: 38%;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{partner.name}</td></tr>')
             if partner.kyb_nif:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #0f172a;">{partner.kyb_nif}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_nif}</td></tr>')
             if partner.kyb_rc:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #0f172a;">{partner.kyb_rc}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_rc}</td></tr>')
             if partner.kyb_nis:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;">{partner.kyb_nis}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nis}</td></tr>')
             if partner.kyb_forme_juridique:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_forme_juridique}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_forme_juridique}</td></tr>')
             if partner.kyb_date_creation:
                 label_immat = _("Date d'Immatriculation")
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{label_immat} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_date_creation}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_date_creation}</td></tr>')
+            if partner.kyb_date_radiation:
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #ef4444;">{partner.kyb_date_radiation}</td></tr>')
             if partner.kyb_capital_social:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_capital_social}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_representant_legal}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_representant_legal}</td></tr>')
             if partner.kyb_activite:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #1e293b;">{partner.kyb_activite}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_activite}</td></tr>')
             if partner.kyb_nae_codes:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;">{partner.kyb_nae_codes}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nae_codes}</td></tr>')
             if partner.kyb_activites_rc:
                 acts_formatted = partner.kyb_activites_rc.replace("\n", "<br/>")
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #475569;">{acts_formatted}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #3f3f46;">{acts_formatted}</td></tr>')
             if partner.kyb_article_imposition:
                 lbl_art = _("Article d'Imposition")
-                rows.append(f'<tr><td style="padding: 2px 0; color: #64748b;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;">{partner.kyb_article_imposition}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_article_imposition}</td></tr>')
 
             rows_html = "".join(rows)
-            now_str = fields.Datetime.now().strftime("%d/%m/%Y %H:%M")
+            now_dt = fields.Datetime.now()
+            now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
-                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; border-left: 4px solid #533afd; padding: 10px 14px; background: rgba(83, 58, 253, 0.04); border-radius: 4px; margin: 4px 0;">'
+                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; border: 1px solid #e4e4e7; padding: 12px 14px; background: #fafafa; border-radius: 8px; margin: 6px 0;">'
                 f'<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">'
-                f'<strong style="color: #533afd; font-size: 13px;">🛡️ {_("Vérification KYB")}</strong>'
-                f'<span style="background: {badge_color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">{badge_text}</span>'
+                f'<strong style="color: #18181b; font-size: 13px; font-weight: 600;">{_("Vérification KYB")}</strong>'
+                f'<span style="background: {badge_color}; color: white; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600;">{badge_text}</span>'
                 f'</div>'
                 f'<table style="width: 100%; font-size: 12px; border-collapse: collapse;">{rows_html}</table>'
-                f'<div style="margin-top: 8px; font-size: 10px; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 4px;">'
-                f'{_("Consultation Registre CNRC")} · Algérie Télécom Sovereign Cloud · {now_str}'
+                f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid #e4e4e7; padding-top: 4px;">'
+                f'{_("Consultation Registre Officiel")} · {now_str}'
                 f'</div>'
                 '</div>'
             )
@@ -610,15 +786,58 @@ class ResPartner(models.Model):
             vals = {}
             if not partner.kyb_last_verified:
                 vals["kyb_last_verified"] = fields.Datetime.now()
-            if partner.kyb_statut_cnrc == "RADIE" and not partner.kyb_date_radiation:
-                # Check data dictionary first to avoid any external network call
+
+            # 1. Sync Date d'Immatriculation from incoming data or resolve fallback
+            d_crea = False
+            if isinstance(data, dict):
+                d_crea = (
+                    data.get("date_creation")
+                    or data.get("date_immatriculation")
+                    or data.get("dateImmatriculation")
+                    or data.get("dateCreation")
+                )
+            norm_crea = _normalize_algerian_date(d_crea)
+            if norm_crea and str(partner.kyb_date_creation or "")[:10] != norm_crea:
+                vals["kyb_date_creation"] = norm_crea
+            elif not partner.kyb_date_creation:
+                query = partner.kyb_rc or partner.kyb_nif or partner.vat
+                if query:
+                    try:
+                        client = _get_kyb_client(partner.env)
+                        prof = client.resolve(query)
+                        ent = prof.get("entity") or prof.get("data") or prof
+                        d_crea = (
+                            ent.get("date_creation")
+                            or ent.get("date_immatriculation")
+                            or ent.get("dateImmatriculation")
+                            or ent.get("dateCreation")
+                        )
+                        norm_crea = _normalize_algerian_date(d_crea)
+                        if norm_crea:
+                            vals["kyb_date_creation"] = norm_crea
+                    except Exception:
+                        pass
+
+            # 2. Sync Status and Date de Radiation
+            incoming_statut = (data.get("statut_cnrc") or data.get("statutCnrc") or data.get("statut") or "") if isinstance(data, dict) else ""
+            if incoming_statut:
+                incoming_norm = incoming_statut.upper()
+                statut_val = "RADIE" if ("RAD" in incoming_norm or "مشطب" in incoming_norm) else ("ACTIF" if ("ACT" in incoming_norm or "نشط" in incoming_norm) else incoming_norm)
+                if partner.kyb_statut_cnrc != statut_val:
+                    vals["kyb_statut_cnrc"] = statut_val
+
+            effective_statut = (vals.get("kyb_statut_cnrc") or incoming_statut or partner.kyb_statut_cnrc or "").upper()
+            is_radie = "RAD" in effective_statut or "مشطب" in effective_statut
+
+            if is_radie:
+                d_rad = False
                 if isinstance(data, dict):
                     d_rad = data.get("date_radiation") or data.get("dateRadiation") or data.get("radiation_date")
-                    norm_rad = _normalize_algerian_date(d_rad)
-                    if norm_rad:
-                        vals["kyb_date_radiation"] = norm_rad
-                if not vals.get("kyb_date_radiation"):
-                    query = partner.kyb_nif or partner.kyb_rc or partner.name
+                norm_rad = _normalize_algerian_date(d_rad)
+                if norm_rad and str(partner.kyb_date_radiation or "")[:10] != norm_rad:
+                    vals["kyb_date_radiation"] = norm_rad
+                elif not partner.kyb_date_radiation:
+                    query = partner.kyb_rc or partner.kyb_nif or partner.vat or partner.name
                     if query:
                         try:
                             client = _get_kyb_client(partner.env)
@@ -630,35 +849,37 @@ class ResPartner(models.Model):
                                 vals["kyb_date_radiation"] = norm_rad
                         except Exception:
                             pass
-            if not partner.kyb_date_creation:
-                if isinstance(data, dict):
-                    d_crea = (
-                        data.get("date_creation")
-                        or data.get("date_immatriculation")
-                        or data.get("dateImmatriculation")
-                        or data.get("dateCreation")
+            else:
+                # Active company must never retain a stale strike-off date
+                if partner.kyb_date_radiation:
+                    vals["kyb_date_radiation"] = False
+
+            # 3. Defensive Invariant Gate: Date d'Immatriculation must be <= Date de Radiation
+            eff_crea = vals.get("kyb_date_creation") or partner.kyb_date_creation
+            eff_rad = vals.get("kyb_date_radiation") or partner.kyb_date_radiation
+            if eff_crea and eff_rad and is_radie:
+                str_crea = str(eff_crea)[:10]
+                str_rad = str(eff_rad)[:10]
+                if str_crea > str_rad:
+                    _logger.warning(
+                        "KYB date anomaly on partner #%s: immatriculation %s > radiation %s. Resolving official dates.",
+                        partner.id, str_crea, str_rad
                     )
-                    norm_crea = _normalize_algerian_date(d_crea)
-                    if norm_crea:
-                        vals["kyb_date_creation"] = norm_crea
-                if not vals.get("kyb_date_creation"):
-                    query = partner.kyb_rc or partner.kyb_nif or partner.vat
-                    if query:
-                        try:
-                            client = _get_kyb_client(partner.env)
+                    try:
+                        client = _get_kyb_client(partner.env)
+                        query = partner.kyb_rc or partner.kyb_nif or partner.vat
+                        if query:
                             prof = client.resolve(query)
                             ent = prof.get("entity") or prof.get("data") or prof
-                            d_crea = (
-                                ent.get("date_creation")
-                                or ent.get("date_immatriculation")
-                                or ent.get("dateImmatriculation")
-                                or ent.get("dateCreation")
-                            )
-                            norm_crea = _normalize_algerian_date(d_crea)
-                            if norm_crea:
-                                vals["kyb_date_creation"] = norm_crea
-                        except Exception:
-                            pass
+                            real_crea = _normalize_algerian_date(ent.get("date_immatriculation") or ent.get("date_creation"))
+                            real_rad = _normalize_algerian_date(ent.get("date_radiation"))
+                            if real_crea:
+                                vals["kyb_date_creation"] = real_crea
+                            if real_rad:
+                                vals["kyb_date_radiation"] = real_rad
+                    except Exception as e_inv:
+                        _logger.warning("Defensive date correction failed: %s", e_inv)
+
             if vals:
                 partner.write(vals)
 
@@ -997,22 +1218,46 @@ class ResPartner(models.Model):
                 self.kyb_activites_rc = False
 
             adresse = data.get("adresse") or data.get("adresseSiegeSocial", "")
-            wilaya = data.get("wilaya", "")
-            if adresse and not self.street:
-                self.street = adresse
-            elif wilaya and not self.street:
-                self.street = f"Siège Social, {wilaya}"
+            wilaya_raw = data.get("wilaya", "")
+            commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(wilaya_raw or adresse)
 
-            if wilaya and not self.city:
-                self.city = wilaya
+            clean_street = adresse
+            if "/" in (adresse or ""):
+                c_part, w_part, _wcode = _split_algerian_commune_wilaya(adresse)
+                if c_part and w_part:
+                    clean_street = f"Commune {c_part}, Wilaya de {w_part}"
+                elif w_part:
+                    clean_street = f"Wilaya de {w_part}"
+
+            if clean_street:
+                self.street = clean_street
+            elif wilaya_name:
+                self.street = f"Siège Social, {wilaya_name}"
+            else:
+                self.street = False
+
+            city_val = commune_name if commune_name else wilaya_name
+            self.city = city_val or False
+
+            # Resolve Country & State
+            dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
+            self.country_id = dz_country.id if dz_country else False
+            if wilaya_name and dz_country:
+                domain = [("country_id", "=", dz_country.id)]
+                if wilaya_code:
+                    domain.extend(["|", ("code", "=", wilaya_code), ("name", "ilike", wilaya_name)])
+                else:
+                    domain.append(("name", "ilike", wilaya_name))
+                st = self.env["res.country.state"].search(domain, limit=1)
+                self.state_id = st.id if st else False
+            else:
+                self.state_id = False
 
             article = data.get("article_imposition") or data.get("articleImposition") or data.get("article_imp", "")
-            if article and not self.kyb_article_imposition:
-                self.kyb_article_imposition = article
+            self.kyb_article_imposition = article or False
 
             nis = data.get("nis") or data.get("numero_nis", "")
-            if nis:
-                self.kyb_nis = nis
+            self.kyb_nis = nis or False
             self.kyb_last_verified = fields.Datetime.now()
 
             # If calling on an existing record, persist immediately to database
@@ -1036,11 +1281,13 @@ class ResPartner(models.Model):
                     "is_company": self.is_company,
                     "street": self.street,
                     "city": self.city,
+                    "country_id": self.country_id.id if self.country_id else False,
+                    "state_id": self.state_id.id if self.state_id else False,
                     "kyb_last_verified": self.kyb_last_verified,
                 }
                 if "company_registry" in self._fields and self.company_registry:
                     write_vals["company_registry"] = self.company_registry
-                self.write({k: v for k, v in write_vals.items() if v is not False or k in ("kyb_date_radiation", "kyb_date_creation", "kyb_activites_rc")})
+                self.write(write_vals)
                 self._post_kyb_audit_log()
 
             # ── Duplicate Fiscal Identifier (NIF) Guard ──
@@ -1143,19 +1390,21 @@ class ResPartner(models.Model):
                         rc_raw = direct_data.get("rc_number") or ""
                         rc = rc_official or format_official_rc(rc_raw) or rc_raw
                         nif = direct_data.get("nif") or (clean_q if clean_q.isdigit() else "")
-                        wilaya = direct_data.get("wilaya") or ""
+                        c_dir, w_dir, _wcode = _split_algerian_commune_wilaya(direct_data.get("wilaya") or direct_data.get("adresse") or "")
+                        wilaya_clean = w_dir or direct_data.get("wilaya") or ""
+                        city_clean = c_dir if c_dir else wilaya_clean
                         statut = direct_data.get("statut_cnrc") or "ACTIF"
                         statut_badge = "🟢 Actif" if "ACT" in statut.upper() else ("🔴 Radié" if "RAD" in statut.upper() else "")
                         return [{
                             "name": raison,
-                            "city": wilaya or "Algérie",
+                            "city": city_clean or "Algérie",
                             "country_id": dz_country_dict,
                             "duns": nif or rc_raw or rc or clean_q,
                             "vat": nif,
                             "rc_number": rc_raw,
                             "rc_official": rc_official or rc,
-                            "wilaya": wilaya,
-                            "description": f"{wilaya} • RC: {rc} {statut_badge}".strip(" •"),
+                            "wilaya": wilaya_clean,
+                            "description": f"{wilaya_clean} • RC: {rc} {statut_badge}".strip(" •"),
                         }]
                 except Exception:
                     pass
@@ -1180,7 +1429,9 @@ class ResPartner(models.Model):
             rc_official = cand.get("rc_number_official") or cand.get("rcNumberOfficial") or ""
             rc_raw = cand.get("rc_number") or cand.get("rc") or ""
             rc = rc_official or format_official_rc(rc_raw) or rc_raw
-            wilaya = cand.get("wilaya") or ""
+            c_name, w_name, _wcode = _split_algerian_commune_wilaya(cand.get("wilaya") or "")
+            wilaya_clean = w_name or cand.get("wilaya") or ""
+            city_clean = c_name if c_name else wilaya_clean
             statut = cand.get("statut_cnrc") or cand.get("statut") or "ACTIF"
 
             statut_badge = "🟢 Actif" if "ACT" in statut.upper() else ("🔴 Radié" if "RAD" in statut.upper() else "")
@@ -1199,14 +1450,14 @@ class ResPartner(models.Model):
 
             results.append({
                 "name": raison,
-                "city": wilaya or "Algérie",
+                "city": city_clean or "Algérie",
                 "country_id": dz_country_dict,
                 "duns": chosen_duns,
                 "vat": nif,
                 "rc_number": rc_raw,
                 "rc_official": rc_official or rc,
-                "wilaya": wilaya,
-                "description": f"{wilaya} • RC: {rc} {statut_badge}{local_tag}".strip(" •"),
+                "wilaya": wilaya_clean,
+                "description": f"{wilaya_clean} • RC: {rc} {statut_badge}{local_tag}".strip(" •"),
             })
         return results
 
@@ -1232,16 +1483,19 @@ class ResPartner(models.Model):
                 rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
                 rc_raw = data.get("rc_number") or ""
                 rc = rc_official or format_official_rc(rc_raw) or rc_raw
+                c_vat, w_vat, _wcode = _split_algerian_commune_wilaya(data.get("wilaya") or data.get("adresse") or "")
+                wilaya_clean = w_vat or data.get("wilaya") or ""
+                city_clean = c_vat if c_vat else wilaya_clean
                 return [{
                     "name": data.get("raison_sociale") or data.get("name") or vat,
-                    "city": data.get("wilaya") or "Algérie",
+                    "city": city_clean or "Algérie",
                     "country_id": dz_country_dict,
                     "duns": data.get("nif") or vat,
                     "vat": data.get("nif") or vat,
                     "rc_number": rc_raw,
                     "rc_official": rc_official or rc,
-                    "wilaya": data.get("wilaya") or "",
-                    "description": f"{data.get('wilaya', '')} • RC: {rc}".strip(" •"),
+                    "wilaya": wilaya_clean,
+                    "description": f"{wilaya_clean} • RC: {rc}".strip(" •"),
                 }]
         except Exception as exc:
             _logger.warning("KYB VAT autocomplete failed for '%s': %s", vat, exc)
@@ -1342,21 +1596,25 @@ class ResPartner(models.Model):
 
         # Map Wilaya to res.country.state (or auto-create if missing in vanilla Odoo)
         state_dict = False
-        wilaya_name = data.get("wilaya") or candidate_ctx.get("wilaya") or candidate_ctx.get("city") or ""
+        raw_loc = data.get("wilaya") or candidate_ctx.get("wilaya") or data.get("adresse") or ""
+        commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(raw_loc)
+        if not wilaya_name:
+            wilaya_name = str(data.get("wilaya") or candidate_ctx.get("wilaya") or "").title()
+
         if wilaya_name and dz_country:
-            state = self.env["res.country.state"].search([
-                ("country_id", "=", dz_country.id),
-                "|",
-                ("name", "ilike", wilaya_name),
-                ("code", "ilike", wilaya_name[:2]),
-            ], limit=1)
+            search_domain = [("country_id", "=", dz_country.id)]
+            if wilaya_code:
+                search_domain.extend(["|", ("code", "=", wilaya_code), ("name", "ilike", wilaya_name)])
+            else:
+                search_domain.append(("name", "ilike", wilaya_name))
+            state = self.env["res.country.state"].search(search_domain, limit=1)
             if not state:
                 try:
-                    w_code = wilaya_name[:2].upper()
+                    w_code = wilaya_code or wilaya_name[:2].upper()
                     if not w_code.isalnum():
                         w_code = "DZ"
                     state = self.env["res.country.state"].sudo().create({
-                        "name": wilaya_name.title(),
+                        "name": wilaya_name,
                         "code": w_code,
                         "country_id": dz_country.id,
                     })
@@ -1431,6 +1689,18 @@ class ResPartner(models.Model):
 
         nif_val = data.get("nif") or candidate_ctx.get("vat") or candidate_ctx.get("nif") or ""
 
+        raw_street = data.get("adresse") or data.get("adresseSiegeSocial") or ""
+        clean_street = raw_street
+        if "/" in (raw_street or ""):
+            c_part, w_part, _wcode = _split_algerian_commune_wilaya(raw_street)
+            if c_part and w_part:
+                clean_street = f"Commune {c_part}, Wilaya de {w_part}"
+            elif w_part:
+                clean_street = f"Wilaya de {w_part}"
+
+        city_val = commune_name if commune_name else wilaya_name
+        date_rad_val = _normalize_algerian_date(data.get("date_radiation") or data.get("dateRadiation") or data.get("radiation_date"))
+
         enrich_dict = {
             "name": data.get("raison_sociale") or data.get("raisonSociale") or data.get("name") or candidate_ctx.get("name", ""),
             "vat": nif_val,
@@ -1439,11 +1709,13 @@ class ResPartner(models.Model):
             "kyb_nis": data.get("nis") or data.get("numero_nis") or "",
             "kyb_article_imposition": data.get("article_imposition") or data.get("articleImposition") or "",
             "kyb_statut_cnrc": statut_mapped,
+            "kyb_date_creation": date_crea_val or False,
+            "kyb_date_radiation": date_rad_val if statut_mapped == "RADIE" else False,
             "kyb_activite": primary_formatted,
             "kyb_nae_codes": nae_str,
             "kyb_activites_rc": "\n".join(secondary_acts_lines) if secondary_acts_lines else False,
-            "street": data.get("adresse") or data.get("adresseSiegeSocial") or "",
-            "city": wilaya_name.title() if wilaya_name else "",
+            "street": clean_street,
+            "city": city_val,
         }
 
         if is_pm:
@@ -1472,9 +1744,44 @@ class ResPartner(models.Model):
             enrich_dict["kyb_representant_legal"] = str(enrich_dict.get("name") or "") + " (Titulaire)"
         if dz_country_dict:
             enrich_dict["country_id"] = dz_country_dict
+        else:
+            enrich_dict["country_id"] = False
         if state_dict:
             enrich_dict["state_id"] = state_dict
-        if "company_registry" in self._fields and rc_val:
-            enrich_dict["company_registry"] = rc_val
+        else:
+            enrich_dict["state_id"] = False
+        if "company_registry" in self._fields:
+            enrich_dict["company_registry"] = rc_val or False
 
-        return {k: v for k, v in enrich_dict.items() if (v is not None and v != "" and v is not False) or (k == "is_company" and v is not None)}
+        # Whitelisted core fields: always return so Odoo's autocomplete client
+        # cleanly replaces previous candidate values without bleeding or leakage.
+        # Date fields (kyb_date_creation, kyb_date_radiation) are EXCLUDED
+        # from this autocomplete return path to prevent Odoo 20's serializeDate()
+        # TypeError: value.toFormat is not a function. In Odoo 20, the web framework
+        # expects Luxon DateTime objects for Date fields in onchange payloads, but this
+        # autocomplete RPC returns raw ISO strings / False. Dates are written correctly
+        # by the server-side write() path in action_verify_kyb_sheet, which bypasses
+        # the client-side Luxon serialization layer entirely. (Fix: v2.0.1)
+        ALWAYS_SYNC_FIELDS = {
+            "name", "vat", "kyb_nif", "kyb_rc", "kyb_nis", "kyb_article_imposition",
+            "kyb_statut_cnrc", "kyb_activite",
+            "kyb_nae_codes", "kyb_activites_rc", "street", "city", "country_id", "state_id",
+            "is_company", "company_type", "kyb_forme_juridique", "kyb_capital_social",
+            "kyb_representant_legal", "company_registry"
+        }
+        # Explicitly block date fields regardless of value to avoid the Luxon crash.
+        _AUTOCOMPLETE_DATE_EXCLUDE = {"kyb_date_creation", "kyb_date_radiation"}
+        return {
+            k: v for k, v in enrich_dict.items()
+            if k not in _AUTOCOMPLETE_DATE_EXCLUDE
+            and (k in ALWAYS_SYNC_FIELDS or (v is not None and v != ""))
+        }
+
+    @api.model
+    def cron_kyb_sync_telemetry(self):
+        """Automated daily cron: sends heartbeat telemetry and checks for updates."""
+        try:
+            self.env["res.config.settings"].cron_kyb_sync_telemetry()
+        except Exception as err:
+            _logger.warning("KYB res.partner cron telemetry failed: %s", err)
+

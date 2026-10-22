@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "KYB — Algerian Corporate Identity & Temporal Fiscal Compliance",
-    "version": "18.0.2.0.2",
+    "version": "19.0.2.0.2",
     "category": "Accounting/Localisation",
     "summary": "Instant NIF/RC verification (<10ms), temporal strike-off audit (CIDTA Art. 176), autonomous 1-click update engine, and enterprise fleet telemetry.",
     "description": """

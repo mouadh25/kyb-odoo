@@ -15,11 +15,39 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.2` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.2` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.2` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.2` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.2` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.4` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.4` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.4` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+
+---
+
+## [2.0.4] - 2026-10-24
+
+### Changed
+* **Discrete Autocomplete Status Badges:**
+  Streamlined company legal standing badges in partner autocomplete dropdowns to minimalist text badges (`Actif` in green / `Radié` in red) aligned to the far right, eliminating emoji artifacts.
+* **Official Décret 05-468 RC Canonical Normalization:**
+  Enforced canonical 16-character Trade Register formatting (`WW/00-XXXXXXX[A|B|C|D]YY`) on field exit with automatic padding and bidirectional registry sync.
+* **Chatter Deduplication Governance:**
+  Added strict duplicate prevention in `res.partner` chatter to avoid duplicate verification cards when clicking re-verification.
+* **ITIL Change Enablement Policy:**
+  Formalized update policy modes in General Settings (`Manual` vs `Automatic`) with expanded configuration layout for enterprise fleet governance.
+
+---
+
+## [2.0.3] - 2026-10-23
+
+### Added
+* **Rich Autocomplete Dropdown:**
+  Predictive company autocomplete rendering real-time legal standing badges, formatted RC, Wilaya, legal structure, and local duplicate warning (`• ⚠️ Existant (#ID)`).
+* **Fiscal Prioritization & Sorting:**
+  Prioritized active enterprises (`Actif`) before deregistered vendors in autocomplete dropdowns.
+* **Configurable Autocomplete Filtering:**
+  Added settings for result filtering (`all` vs `active_only`) and customizable result limits (10 to 30, default 20) in Odoo General Settings.
+* **Auto-Update Default Enablement:**
+  Configured automatic patch updates enabled by default for zero-maintenance patch delivery.
 
 ---
 

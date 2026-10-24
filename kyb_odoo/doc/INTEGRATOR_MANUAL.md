@@ -65,11 +65,7 @@ Enterprise administrators manage their KYB subscription, credentials, and consum
 * **Master Tenant Account:** Represents the enterprise contracting entity. Billing credits and master subscriptions are centralized at the tenant level.
 * **Sub-Keys (`sk_live_...` / `sk_test_...`):** Downstream ERP connectors authenticate exclusively via scoped Sub-Keys. Each Sub-Key is linked to the tenant's shared master credit pool while maintaining independent metrics and security constraints.
 
-![Tenant Credit Pool Management](screenshots/step00_kyb_portal_tenant_management.png)
-*Figure 1: Master Tenant Credit Pool Provisioning & Enterprise Plan Cockpit.*
-
-![Customer Portal Client Overview](screenshots/step00b_kyb_portal_client_overview.png)
-*Figure 2: Enterprise Client Dashboard showing Master Pool balance and 14-day API consumption velocity.*
+> **🌐 Live Portal Interface:** The Tenant Credit Pool dashboard, API consumption graphs, and Sub-Key management cockpit are accessible exclusively at [kyb.digidevagency.dz](https://kyb.digidevagency.dz) after administrator login. Portal screenshots are not bundled with the connector package — refer to the KYB Customer Portal directly for live UI.
 
 ### B. Subscription Tiers & Sub-Key Quotas
 KYB applies strict, transparent credential governance based on the organization's subscription tier:
@@ -80,8 +76,6 @@ KYB applies strict, transparent credential governance based on the organization'
 | **Growth** | 10,000 / month | Up to **10 Sub-Keys** | Multi-branch Odoo deployments (HQ, Regional branches, UAT). |
 | **Enterprise** | 50,000+ / month | **Custom / Unlimited** | Distributed multi-company conglomerates with automated CI/CD. |
 
-![Sub-Keys Management Cockpit](screenshots/step00c_kyb_portal_subkeys_management.png)
-*Figure 3: Scoped Sub-Keys Management showing allocated limits, monthly usage counters, and environment scoping.*
 
 ### C. Portal Sub-Key Lifecycle & Governance
 1. **Capacity Meter:** The portal dashboard displays real-time Sub-Key utilization (`Active Sub-Keys` vs. `Allocated by Subscription`). If the quota is reached, generating additional sub-keys requires archiving an unused key or upgrading the subscription tier.
@@ -192,8 +186,8 @@ Auto-complétion libre     Enrichissement      Résolution déterministe     Pro
 ![Verified Company Partner](screenshots/scenario_s01_rc_cat_b_corporate.png)
 *Figure 8: Fully enriched Company Partner (DIGI DEV AGENCY, EURL) displaying canonical Décret 05-468 RC format (20/00-0072885B01) and green ACTIF badge.*
 
-![Wilaya 00 Legacy National Partner](screenshots/scenario_s04_rc_legacy_wilaya_00.png)
-*Figure 9: Legacy National Commercial Register entity (BELLAT FER DISTRIBUTION BFD) formatted to canonical 00/00-0012637B00 (National Commercial Register Standard).*
+![Verified Company Partner — Additional Example](screenshots/scenario_s04_rc_legacy_wilaya_00.png)
+*Figure 9: Enriched Company Partner displaying the canonical KYB tab with full Décret 05-468 fields (RC, NIF, NIS, statut CNRC, forme juridique, capital social, représentant légal, activités NAE).*
 
 ### B. Person Contacts (`Personne Physique`, `is_company = False`)
 - **Commercial Registry (RC):** Category `A` (Commerçant individuel) or Category `C` (Artisan / Coopérative) (e.g., `51/00-0000006A`, `16/00-0012345C16`).
@@ -205,8 +199,8 @@ Auto-complétion libre     Enrichissement      Résolution déterministe     Pro
 ![Verified Person Partner](screenshots/scenario_s02_rc_cat_a_personne_physique.png)
 *Figure 10: Enriched Personne Physique contact (BENALI SOFIANE, Commerçant) classified with is_company=False, Category A RC (26/00-16208703A26).*
 
-![Verified Artisan Partner](screenshots/scenario_s03_rc_cat_c_artisan.png)
-*Figure 11: Enriched Artisan contact (COOPÉRATIVE ARTISANALE DU BOIS) classified with Category C RC (16/00-0012345C16).*
+![Verified Individual Merchant](screenshots/scenario_s03_rc_cat_c_artisan.png)
+*Figure 11: Enriched Personne Physique contact showing `is_company=False`, the KYB tab populated with Category A/C RC and `Personne Physique` legal form classification.*
 
 ---
 

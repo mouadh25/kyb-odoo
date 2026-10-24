@@ -10,88 +10,131 @@
                 <app data-string="KYB Compliance" string="KYB Compliance" name="kyb_odoo" logo="/kyb_odoo/static/description/icon.png">
                     <block title="KYB Corporate Identity &amp; Fiscal Verification" id="kyb_settings_block">
                         <setting string="KYB (by Digidev) Credentials" help="Configure your KYB secret API key (hosted locally on Algérie Télécom Cloud).">
-                            <div class="content-group">
-                                <div class="row mt4">
-                                    <label for="kyb_api_key" class="col-lg-3 o_light_label" string="API Key"/>
-                                    <field name="kyb_api_key" password="True" placeholder="sk_live_... ou sk_test_kyb_sandbox_key_001"/>
+                            <div class="content-group mt-2">
+                                <div class="row mt-2">
+                                    <label for="kyb_api_key" class="col-12 col-lg-3 o_light_label font-weight-bold" string="API Key"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_api_key" password="True" placeholder="sk_live_... ou sk_test_kyb_sandbox_key_001" class="w-100"/>
+                                    </div>
                                 </div>
-                                <div class="row mt4">
-                                    <label for="kyb_base_url" class="col-lg-3 o_light_label" string="Gateway URL"/>
-                                    <field name="kyb_base_url" placeholder="https://kyb.digidevagency.dz"/>
+                                <div class="row mt-2">
+                                    <label for="kyb_base_url" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Gateway URL"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_base_url" placeholder="https://kyb.digidevagency.dz" class="w-100"/>
+                                    </div>
                                 </div>
                             </div>
                         </setting>
-                        <setting string="CNRC Autocomplete" help="Replaces international company search with the National Trade Registry via KYB.">
+
+                        <setting string="CNRC Autocomplete" help="Remplace la recherche d'entreprises internationale par le Registre National du Commerce (CNRC) via l'API KYB.">
                             <field name="kyb_sovereign_autocomplete"/>
-                            <div class="content-group">
-                                <div class="mt8">
+                            <div class="content-group mt-2">
+                                <div class="mt-2">
                                     <field name="kyb_allow_worldwide_fallback" class="oe_inline"/>
-                                    <label for="kyb_allow_worldwide_fallback" string="Allow Worldwide Fallback Search" class="oe_inline"/>
+                                    <label for="kyb_allow_worldwide_fallback" string="Autoriser la recherche mondiale de secours (Dun &amp; Bradstreet / IAP)" class="oe_inline ms-2"/>
+                                </div>
+                                <div class="row mt-3">
+                                    <label for="kyb_autocomplete_filter" string="Filtre Statut des Tiers" class="col-12 col-lg-3 o_light_label font-weight-bold"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_autocomplete_filter" class="w-100"/>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <label for="kyb_autocomplete_limit" string="Nombre Max de Résultats" class="col-12 col-lg-3 o_light_label font-weight-bold"/>
+                                    <div class="col-12 col-lg-9 d-flex align-items-center">
+                                        <field name="kyb_autocomplete_limit" class="oe_inline" style="width: 100px;"/>
+                                        <span class="text-muted ms-3 small">Candidats affichés dans la liste déroulante (recommandé : 10 à 20 — impact latence négligeable &lt; 3ms).</span>
+                                    </div>
                                 </div>
                             </div>
                         </setting>
 
                         <setting string="Détection des Doublons Fiscaux (NIF)" help="Avertit ou bloque lors de la saisie d'un NIF déjà existant sur une autre fiche contact.">
-                            <field name="kyb_duplicate_nif_policy"/>
+                            <field name="kyb_duplicate_nif_policy" class="w-100"/>
                         </setting>
 
                         <setting string="Temporal Invoice Compliance &amp; Blocking Policy" help="Enforce CIDTA Art. 169 &amp; 176 and CTCA Art. 30 rules on vendor bills.">
                             <field name="kyb_invoice_audit_enabled"/>
-                            <div class="content-group">
-                                <div class="row mt4">
-                                    <label for="kyb_invoice_blocking_policy" class="col-lg-4 o_light_label" string="Action on Deregistered Supplier"/>
-                                    <field name="kyb_invoice_blocking_policy"/>
+                            <div class="content-group mt-2">
+                                <div class="row mt-2">
+                                    <label for="kyb_invoice_blocking_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action on Deregistered Supplier"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_invoice_blocking_policy" class="w-100"/>
+                                    </div>
                                 </div>
-                                <div class="row mt4">
-                                    <label for="kyb_unverified_partner_policy" class="col-lg-4 o_light_label" string="Action on Unverified Supplier"/>
-                                    <field name="kyb_unverified_partner_policy"/>
+                                <div class="row mt-2">
+                                    <label for="kyb_unverified_partner_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action on Unverified Supplier"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_unverified_partner_policy" class="w-100"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </setting>
+
+                        <setting string="Gouvernance des Mises à Jour" help="Contrôle de version certifiée (Loi 25-11), conformité ITIL Change Enablement et mise à jour en 1 clic.">
+                            <div class="content-group mt-2">
+                                <div class="row mt-2">
+                                    <label for="kyb_installed_version" class="col-12 col-lg-3 o_light_label" string="Version Active"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_installed_version" readonly="1" class="font-weight-bold"/>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <label for="kyb_latest_version" class="col-12 col-lg-3 o_light_label" string="Dernière Version Certifiée"/>
+                                    <div class="col-12 col-lg-9 d-flex align-items-center">
+                                        <field name="kyb_latest_version" readonly="1"/>
+                                        <button name="action_check_kyb_update" type="object" string="Vérifier Disponibilité" class="btn btn-link btn-sm ms-3 p-0" icon="fa-refresh"/>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <label for="kyb_last_telemetry_sync" class="col-12 col-lg-3 o_light_label" string="Dernière Vérification"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_last_telemetry_sync" readonly="1" class="text-muted"/>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-3 pt-3 border-top">
+                                    <label for="kyb_update_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Politique de Déploiement"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_update_policy" widget="radio" class="w-100"/>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="alert alert-info py-2 px-3 mb-2 small d-flex align-items-center rounded" role="status">
+                                            <i class="fa fa-shield fa-lg text-info me-2"/>
+                                            <span><strong>Conformité ITIL Change Enablement :</strong> En mode Manuel, aucune modification de code source n'est exécutée sans validation expresse d'un administrateur certifié via le bouton 1-Clic ci-dessous.</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 d-flex align-items-center gap-3">
+                                    <button name="action_upgrade_kyb_module" type="object" string="Mettre à jour maintenant (1-Clic)" class="btn btn-primary" icon="fa-download" confirm="Cette action va actualiser le module KYB vers la dernière version certifiée. Confirmez-vous le déploiement ?"/>
                                 </div>
                             </div>
                         </setting>
 
                         <setting string="End-of-Month Global Audit (G50 Safety Net)" help="Automatically audit all current month vendor bills before statutory tax filing.">
                             <field name="kyb_eom_auto_audit"/>
-                            <div class="content-group">
-                                <div class="row mt4">
-                                    <label for="kyb_eom_audit_day" class="col-lg-4 o_light_label" string="Execution Day of Month"/>
-                                    <field name="kyb_eom_audit_day"/>
+                            <div class="content-group mt-2">
+                                <div class="row mt-2">
+                                    <label for="kyb_eom_audit_day" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Execution Day of Month"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_eom_audit_day" style="width: 80px;"/>
+                                    </div>
                                 </div>
                             </div>
                         </setting>
 
-                        <setting string="Mises à Jour &amp; Télémétrie de la Flotte" help="Contrôle de version, télémétrie institutionnelle (Loi 25-11) et mise à jour en 1 clic.">
-                            <div class="content-group">
-                                <div class="row mt4">
-                                    <label for="kyb_installed_version" class="col-lg-4 o_light_label" string="Version Installée"/>
-                                    <field name="kyb_installed_version" readonly="1" class="col-lg-8"/>
-                                </div>
-                                <div class="row mt4">
-                                    <label for="kyb_latest_version" class="col-lg-4 o_light_label" string="Dernière Version Disponible"/>
-                                    <field name="kyb_latest_version" readonly="1" class="col-lg-8"/>
-                                </div>
-                                <div class="row mt4">
-                                    <label for="kyb_last_telemetry_sync" class="col-lg-4 o_light_label" string="Dernière Télémétrie"/>
-                                    <field name="kyb_last_telemetry_sync" readonly="1" class="col-lg-8"/>
-                                </div>
-                                <div class="mt16 d-flex gap-2">
-                                    <button name="action_check_kyb_update" type="object" string="Vérifier les Mises à Jour" class="btn btn-secondary btn-sm" icon="fa-refresh"/>
-                                    <button name="action_upgrade_kyb_module" type="object" string="Mettre à jour maintenant (1-Clic)" class="btn btn-primary btn-sm ms-2" icon="fa-download" confirm="Cette action va télécharger la version certifiée et actualiser le module KYB. Confirmez-vous ?"/>
-                                </div>
-                                <div class="mt16">
-                                    <field name="kyb_auto_update_patches" class="oe_inline"/>
-                                    <label for="kyb_auto_update_patches" string="Mise à jour automatique des correctifs mineurs" class="oe_inline ms-2"/>
-                                </div>
-                            </div>
-                        </setting>
-
-                        <!-- Sovereign Legal Framework callout cleanly located in Settings -->
+                        <!-- Legal Framework callout cleanly located in Settings -->
                         <div class="alert alert-secondary mt-3 p-3 rounded" role="status">
                             <div class="d-flex align-items-center">
                                 <i class="fa fa-university fa-2x text-primary me-3"/>
                                 <div>
-                                    <strong class="d-block mb-1">Cadre Réglementaire, Secret Fiscal &amp; Sécurité Souveraine</strong>
+                                    <strong class="d-block mb-1">Cadre Réglementaire, Secret Fiscal &amp; Sécurité des Données</strong>
                                     <p class="mb-0 text-muted small">
-                                        • <strong>Loi 18-07 / 25-11 :</strong> Hébergement 100% souverain sur le Cloud Algérie Télécom (aucune fuite de données à l'étranger).<br/>
+                                        • <strong>Loi 18-07 / 25-11 :</strong> Hébergement 100% en Algérie sur le Datacenter Algérie Télécom (aucune transmission de données hors du territoire national).<br/>
                                         • <strong>Articles 169 &amp; 176 du CIDTA &amp; Art. 30 du CTCA :</strong> Contrôle réglementaire de l'état d'activité des fournisseurs au registre du commerce avant comptabilisation des factures d'achat.<br/>
                                         • <strong>Article 114 du CPF (Secret Fiscal) :</strong> L'Article d'Imposition (Numéro de Rôle) relève du secret fiscal et n'est pas divulgué dans les registres publics CNRC. Il doit être renseigné manuellement sur la fiche contact à réception de la première facture commerciale (Décret 05-468).
                                     </p>

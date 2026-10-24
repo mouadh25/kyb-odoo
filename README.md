@@ -1,6 +1,6 @@
 ﻿# KYB Odoo Connector â€” Algerian Corporate Identity & Temporal Tax Compliance
 
-[![Odoo Version](https://img.shields.io/badge/Odoo-16.0%20|%2017.0%20|%2018.0%20|%2019.0%20|%2020.0-533afd.svg)](https://apps.odoo.com)
+[![Odoo Version](https://img.shields.io/badge/Odoo-16.0%20|%2017.0%20|%2018.0%20|%2019.0%20|%2020.0-18181b.svg)](https://apps.odoo.com)
 [![License: LGPL-3](https://img.shields.io/badge/License-LGPL--3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Sovereign Cloud](https://img.shields.io/badge/Residency-AlgÃ©rie%20TÃ©lÃ©com%20Datacenter-10b981.svg)](https://kyb.digidevagency.dz)
 [![Law Compliance](https://img.shields.io/badge/Compliance-Loi%2018--07%20/%2025--11-06b6d4.svg)](https://kyb.digidevagency.dz)
@@ -144,11 +144,11 @@ For detailed release history, new features, bug fixes, and upgrade notes across 
 
 | Odoo Version | Module Version Code | Market Adoption & Tier | Multi-Language (i18n) | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Odoo 20.0** | `20.0.1.4.5` | Current Released Generation | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 19.0** | `19.0.1.4.5` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 18.0** | `18.0.1.4.5` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 17.0** | `17.0.1.4.5` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 16.0** | `16.0.1.4.5` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 20.0** | `20.0.2.0.4` | Current Released Generation | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 19.0** | `19.0.2.0.4` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 18.0** | `18.0.2.0.4` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 17.0** | `17.0.2.0.4` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 16.0** | `16.0.2.0.4` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
 
 ---
 
@@ -159,7 +159,7 @@ Authoritative documentation and integration guides for the KYB ecosystem:
 * **Authoritative API Documentation:** [kyb.digidevagency.dz/docs](https://kyb.digidevagency.dz/docs)
 * **Interactive Scalar Reference:** [kyb.digidevagency.dz/docs/scalar](https://kyb.digidevagency.dz/docs/scalar)
 * **ERP Integrator & Administrator Manual:** [doc/INTEGRATOR_MANUAL.md](doc/INTEGRATOR_MANUAL.md)
-* **Institutional User Manual (PDF):** [doc/USER_MANUAL.pdf](doc/USER_MANUAL.pdf)
+* **User Manual (PDF):** [doc/USER_MANUAL.pdf](doc/USER_MANUAL.pdf)
 * **Release Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 ---

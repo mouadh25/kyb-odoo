@@ -715,13 +715,18 @@ class ResPartner(models.Model):
         for partner in self:
             if not hasattr(partner, "message_post"):
                 continue
-            # Deduplicate rapid repeat calls (< 10s)
-            if hasattr(partner, "message_ids"):
-                recent = partner.message_ids.filtered(
-                    lambda m: "Vérification KYB" in (m.body or "")
-                )[:1]
-                if recent and recent.date and (fields.Datetime.now() - recent.date).total_seconds() < 10:
+            # Strict Chatter Deduplication Guard: Never post duplicate audit logs on the same partner
+            try:
+                existing_count = self.env["mail.message"].sudo().search_count([
+                    ("model", "=", "res.partner"),
+                    ("res_id", "=", partner.id),
+                    ("body", "ilike", "%Vérification KYB%"),
+                ])
+                if existing_count > 0:
+                    _logger.info("KYB audit card already exists on partner #%s (%d entries) — skipping duplicate", partner.id, existing_count)
                     continue
+            except Exception as e_dedup:
+                _logger.warning("KYB chatter deduplication check failed on partner #%s: %s", partner.id, e_dedup)
 
             statut = (partner.kyb_statut_cnrc or "ACTIF").upper()
             is_radie = "RAD" in statut or "مشطب" in statut
@@ -1409,7 +1414,14 @@ class ResPartner(models.Model):
                 except Exception:
                     pass
 
-            res = client.candidates(query, limit=10)
+            filter_mode = _get_config_param(self.env, "kyb.autocomplete_filter", default="all")
+            limit_setting = _get_config_param(self.env, "kyb.autocomplete_limit", default="20")
+            try:
+                cand_limit = max(10, min(30, int(limit_setting)))
+            except (ValueError, TypeError):
+                cand_limit = 20
+
+            res = client.candidates(query, limit=cand_limit)
         except Exception as exc:
             _logger.warning("KYB candidates search failed for '%s': %s", query, exc)
             if hasattr(super(), "autocomplete_by_name") and allow_worldwide:
@@ -1428,13 +1440,47 @@ class ResPartner(models.Model):
             nif = cand.get("nif") or ""
             rc_official = cand.get("rc_number_official") or cand.get("rcNumberOfficial") or ""
             rc_raw = cand.get("rc_number") or cand.get("rc") or ""
-            rc = rc_official or format_official_rc(rc_raw) or rc_raw
+
+            # 1. Fallback Year Resolution for Official 16-Character RC (Décret 05-468: WW/00-XXXXXXXBYY)
+            fallback_year = None
+            if cand.get("date_immatriculation"):
+                m_yr = re.search(r'(\d{4})', str(cand["date_immatriculation"]))
+                if m_yr:
+                    fallback_year = m_yr.group(1)[-2:]
+            if not fallback_year and cand.get("date_creation"):
+                m_yr = re.search(r'(\d{4})', str(cand["date_creation"]))
+                if m_yr:
+                    fallback_year = m_yr.group(1)[-2:]
+            if not fallback_year and nif and len(nif) >= 4 and nif.startswith("00") and nif[2:4].isdigit():
+                fallback_year = nif[2:4]
+            if not fallback_year and rc_raw and len(rc_raw) >= 3 and rc_raw[:2].isdigit():
+                fallback_year = rc_raw[:2]
+
+            rc_formatted = format_official_rc(rc_official or rc_raw, fallback_year=fallback_year)
+            rc = rc_formatted or rc_official or rc_raw
             c_name, w_name, _wcode = _split_algerian_commune_wilaya(cand.get("wilaya") or "")
             wilaya_clean = w_name or cand.get("wilaya") or ""
             city_clean = c_name if c_name else wilaya_clean
             statut = cand.get("statut_cnrc") or cand.get("statut") or "ACTIF"
+            forme = cand.get("forme_juridique") or cand.get("forme") or ""
 
-            statut_badge = "🟢 Actif" if "ACT" in statut.upper() else ("🔴 Radié" if "RAD" in statut.upper() else "")
+            is_radie = bool("RAD" in str(statut).upper() or "مشطب" in str(statut))
+            is_suspendu = bool("SUSP" in str(statut).upper() or "معلق" in str(statut))
+
+            # Apply user-configured status filter
+            if filter_mode == "active_only" and is_radie:
+                continue
+
+            # Discrete legal status styling (No emoji circles, clean institutional text, discrete badge on far right)
+            if is_radie:
+                statut_label = "Radié"
+                statut_badge_style = "color: #b91c1c; background-color: #fef2f2; border: 1px solid #fecaca; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+            elif is_suspendu:
+                statut_label = "Suspendu"
+                statut_badge_style = "color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+            else:
+                statut_label = "Actif"
+                statut_badge_style = "color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
 
             # Check if this candidate already exists in the local database
             local_partner = False
@@ -1448,17 +1494,39 @@ class ResPartner(models.Model):
             # Use most reliable identifier for duns lookup: nif > raw rc > official rc > raison
             chosen_duns = nif or rc_raw or rc or raison
 
+            # Format spacious subtitle without balls: RC · Wilaya · Forme
+            sub_parts = []
+            if rc:
+                sub_parts.append(f"RC: {rc}")
+            if wilaya_clean:
+                sub_parts.append(wilaya_clean)
+            if forme:
+                sub_parts.append(forme)
+            subtitle = (" · ".join(sub_parts) + local_tag).strip(" ·")
+
             results.append({
                 "name": raison,
-                "city": city_clean or "Algérie",
+                # In Odoo partner_autocomplete_core.js, suggestion.city is copied directly to suggestion.description
+                # Formatting city as subtitle guarantees universal rich rendering across all Odoo versions (16 to 20)
+                "city": subtitle,
                 "country_id": dz_country_dict,
                 "duns": chosen_duns,
                 "vat": nif,
                 "rc_number": rc_raw,
-                "rc_official": rc_official or rc,
+                "rc_official": rc,
                 "wilaya": wilaya_clean,
-                "description": f"{wilaya_clean} • RC: {rc} {statut_badge}{local_tag}".strip(" •"),
+                "statut_cnrc": "RADIE" if is_radie else ("SUSPENDU" if is_suspendu else "ACTIF"),
+                "forme_juridique": forme,
+                "description": subtitle,
+                "statut_badge_clean": statut_label,
+                "statut_badge_style": statut_badge_style,
+                "statut_label": statut_label,
             })
+
+        # When showing all entities, sort ACTIF first, followed by RADIÉ
+        if filter_mode == "all":
+            results.sort(key=lambda x: 1 if ("RAD" in str(x.get("statut_cnrc", "")).upper() or "مشطب" in str(x.get("statut_cnrc", ""))) else 0)
+
         return results
 
     @api.model

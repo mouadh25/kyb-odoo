@@ -56,7 +56,7 @@ class ResConfigSettings(models.TransientModel):
         string="KYB Gateway Base URL",
         config_parameter="kyb.base_url",
         default="https://kyb.digidevagency.dz",
-        help="URL du gateway souverain KYB (par défaut: https://kyb.digidevagency.dz).",
+        help="URL du gateway KYB (par défaut: https://kyb.digidevagency.dz).",
     )
     kyb_sovereign_autocomplete = fields.Boolean(
         string="CNRC Autocomplete",
@@ -69,6 +69,22 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="kyb.allow_worldwide_fallback",
         default=False,
         help="Allows fallback to international search when specifically clicking 'Search Worldwide'.",
+    )
+    kyb_autocomplete_filter = fields.Selection(
+        selection=[
+            ("all", "Toutes les entités (Actif & Radié — Recommandé conformité fiscale)"),
+            ("active_only", "Entités Actives uniquement (Exclure les entreprises radiées)"),
+        ],
+        string="Filtre Autocomplétion Tiers",
+        config_parameter="kyb.autocomplete_filter",
+        default="all",
+        help="Contrôle si l'autocomplétion inclut les entreprises radiées pour l'audit d'anciennes factures ou seulement les entités actives.",
+    )
+    kyb_autocomplete_limit = fields.Integer(
+        string="Nombre Maximum de Résultats",
+        config_parameter="kyb.autocomplete_limit",
+        default=20,
+        help="Nombre de candidats affichés dans le menu déroulant (10 à 30).",
     )
     kyb_duplicate_nif_policy = fields.Selection(
         selection=[
@@ -121,7 +137,7 @@ class ResConfigSettings(models.TransientModel):
         help="Jour du mois auquel l'audit automatique est exécuté (par défaut le 18, avant la date limite fiscale du 20).",
     )
 
-    # ──────────────── Version Telemetry & Auto-Update Engine ────────────────
+    # ──────────────── Version & Auto-Update Engine ────────────────
     kyb_installed_version = fields.Char(
         string="Version Installée",
         compute="_compute_kyb_versions",
@@ -141,15 +157,29 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="kyb.changelog",
     )
     kyb_last_telemetry_sync = fields.Datetime(
-        string="Dernière Télémétrie",
+        string="Dernière Vérification",
         config_parameter="kyb.last_telemetry_sync",
+    )
+    kyb_update_policy = fields.Selection(
+        selection=[
+            ("auto", "Automatique — Correctifs réglementaires et patchs mineurs appliqués sans intervention"),
+            ("manual", "Manuel (Conforme ITIL) — Notification en cockpit uniquement. Validation administrateur requise"),
+        ],
+        string="Politique de Mise à Jour",
+        config_parameter="kyb.update_policy",
+        default="auto",
+        help="En mode Automatique, les correctifs de conformité fiscale (Loi 25-11) sont appliqués de manière autonome. En mode Manuel, aucune modification de code n'est effectuée sans approbation explicite de l'administrateur (conforme aux normes ITIL Change Enablement).",
     )
     kyb_auto_update_patches = fields.Boolean(
         string="Mise à Jour Automatique des Correctifs",
         config_parameter="kyb.auto_update_patches",
-        default=False,
+        default=True,
         help="Applique automatiquement les correctifs de sécurité et de conformité mineurs lors de la vérification planifiée.",
     )
+
+    @api.onchange("kyb_update_policy")
+    def _onchange_kyb_update_policy(self):
+        self.kyb_auto_update_patches = bool(self.kyb_update_policy == "auto")
 
     def _compute_kyb_versions(self):
         import re
@@ -406,12 +436,13 @@ class ResConfigSettings(models.TransientModel):
         try:
             settings = self.env["res.config.settings"].create({})
             settings.action_check_kyb_update()
-            auto_patches = str(_get_config_param(self.env, "kyb.auto_update_patches", "False")).lower() == "true"
+            update_policy = _get_config_param(self.env, "kyb.update_policy", "auto")
+            auto_patches = (update_policy == "auto") and (str(_get_config_param(self.env, "kyb.auto_update_patches", "True")).lower() == "true")
             update_avail = str(_get_config_param(self.env, "kyb.update_available", "false")).lower() == "true"
             force_upgrade = str(_get_config_param(self.env, "kyb.force_upgrade", "false")).lower() == "true"
 
             if update_avail and (auto_patches or force_upgrade):
-                _logger.info("KYB automated in-place upgrade triggered via cron (auto_patches=%s, force_upgrade=%s)", auto_patches, force_upgrade)
+                _logger.info("KYB automated in-place upgrade triggered via cron (policy=%s, force_upgrade=%s)", update_policy, force_upgrade)
                 settings.action_upgrade_kyb_module()
         except Exception as err:
             _logger.warning("KYB cron telemetry sync failed: %s", err)

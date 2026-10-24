@@ -26,6 +26,8 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 ## [2.0.4] - 2026-10-24
 
 ### Changed
+* **Web Client Asset Architecture Hardening:**
+  Streamlined asset bundle declarations and eliminated redundant template overrides to ensure clean CSS/OWL compilation and seamless cross-version compatibility across Odoo 16.0–20.0.
 * **Discrete Autocomplete Status Badges:**
   Streamlined company legal standing badges in partner autocomplete dropdowns to minimalist text badges (`Actif` in green / `Radié` in red) aligned to the far right, eliminating emoji artifacts.
 * **Official Décret 05-468 RC Canonical Normalization:**

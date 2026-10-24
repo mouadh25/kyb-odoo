@@ -1400,16 +1400,17 @@ class ResPartner(models.Model):
                         city_clean = c_dir if c_dir else wilaya_clean
                         statut = direct_data.get("statut_cnrc") or "ACTIF"
                         statut_badge = "🟢 Actif" if "ACT" in statut.upper() else ("🔴 Radié" if "RAD" in statut.upper() else "")
+                        dir_sub = f"RC: {rc} · {wilaya_clean} · {statut_badge}".strip(" ·")
                         return [{
                             "name": raison,
-                            "city": city_clean or "Algérie",
+                            "city": dir_sub,
                             "country_id": dz_country_dict,
                             "duns": nif or rc_raw or rc or clean_q,
                             "vat": nif,
                             "rc_number": rc_raw,
                             "rc_official": rc_official or rc,
                             "wilaya": wilaya_clean,
-                            "description": f"{wilaya_clean} • RC: {rc} {statut_badge}".strip(" •"),
+                            "description": dir_sub,
                         }]
                 except Exception:
                     pass
@@ -1471,30 +1472,33 @@ class ResPartner(models.Model):
             if filter_mode == "active_only" and is_radie:
                 continue
 
-            # Discrete legal status styling (No emoji circles, clean institutional text, discrete badge on far right)
+            # Legal status badge (🟢 Actif / 🔴 Radié / 🟡 Suspendu)
             if is_radie:
-                statut_label = "Radié"
-                statut_badge_style = "color: #b91c1c; background-color: #fef2f2; border: 1px solid #fecaca; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+                statut_badge = "🔴 Radié"
             elif is_suspendu:
-                statut_label = "Suspendu"
-                statut_badge_style = "color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+                statut_badge = "🟡 Suspendu"
             else:
-                statut_label = "Actif"
-                statut_badge_style = "color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+                statut_badge = "🟢 Actif"
 
-            # Check if this candidate already exists in the local database
+            # Check if this candidate already exists in the local database (by NIF, RC, or exact name)
             local_partner = False
             if nif:
                 local_partner = self.env["res.partner"].sudo().search([("kyb_nif", "=", nif)], limit=1)
-            elif rc:
-                local_partner = self.env["res.partner"].sudo().search(["|", ("kyb_rc", "=", rc), ("company_registry", "=", rc)] if "company_registry" in self.env["res.partner"]._fields else [("kyb_rc", "=", rc)], limit=1)
+            if not local_partner and rc:
+                rc_variants = list(filter(None, {rc, rc_raw, rc_official, format_official_rc(rc_raw)}))
+                domain = [("kyb_rc", "in", rc_variants)]
+                if "company_registry" in self.env["res.partner"]._fields:
+                    domain = ["|", ("kyb_rc", "in", rc_variants), ("company_registry", "in", rc_variants)]
+                local_partner = self.env["res.partner"].sudo().search(domain, limit=1)
+            if not local_partner and raison:
+                local_partner = self.env["res.partner"].sudo().search([("name", "=ilike", raison.strip())], limit=1)
 
             local_tag = f" • ⚠️ Existant (#{local_partner.id})" if local_partner else ""
 
             # Use most reliable identifier for duns lookup: nif > raw rc > official rc > raison
             chosen_duns = nif or rc_raw or rc or raison
 
-            # Format spacious subtitle without balls: RC · Wilaya · Forme
+            # Format rich subtitle: RC · Wilaya · Forme · Status
             sub_parts = []
             if rc:
                 sub_parts.append(f"RC: {rc}")
@@ -1502,6 +1506,8 @@ class ResPartner(models.Model):
                 sub_parts.append(wilaya_clean)
             if forme:
                 sub_parts.append(forme)
+            if statut_badge:
+                sub_parts.append(statut_badge)
             subtitle = (" · ".join(sub_parts) + local_tag).strip(" ·")
 
             results.append({
@@ -1518,9 +1524,8 @@ class ResPartner(models.Model):
                 "statut_cnrc": "RADIE" if is_radie else ("SUSPENDU" if is_suspendu else "ACTIF"),
                 "forme_juridique": forme,
                 "description": subtitle,
-                "statut_badge_clean": statut_label,
-                "statut_badge_style": statut_badge_style,
-                "statut_label": statut_label,
+                "statut_badge_clean": statut_badge,
+                "statut_label": statut_badge,
             })
 
         # When showing all entities, sort ACTIF first, followed by RADIÉ

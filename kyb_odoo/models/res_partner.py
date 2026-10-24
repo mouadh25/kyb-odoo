@@ -1472,13 +1472,16 @@ class ResPartner(models.Model):
             if filter_mode == "active_only" and is_radie:
                 continue
 
-            # Legal status badge (🟢 Actif / 🔴 Radié / 🟡 Suspendu)
+            # Discrete legal status styling (No emoji circles, clean institutional text, discrete badge on far right)
             if is_radie:
-                statut_badge = "🔴 Radié"
+                statut_label = "Radié"
+                statut_badge_style = "color: #b91c1c; background-color: #fef2f2; border: 1px solid #fecaca; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
             elif is_suspendu:
-                statut_badge = "🟡 Suspendu"
+                statut_label = "Suspendu"
+                statut_badge_style = "color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
             else:
-                statut_badge = "🟢 Actif"
+                statut_label = "Actif"
+                statut_badge_style = "color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
 
             # Check if this candidate already exists in the local database (by NIF, RC, or exact name)
             local_partner = False
@@ -1498,7 +1501,7 @@ class ResPartner(models.Model):
             # Use most reliable identifier for duns lookup: nif > raw rc > official rc > raison
             chosen_duns = nif or rc_raw or rc or raison
 
-            # Format rich subtitle: RC · Wilaya · Forme · Status
+            # Format spacious subtitle: RC · Wilaya · Forme (Status rendered discrete on far right)
             sub_parts = []
             if rc:
                 sub_parts.append(f"RC: {rc}")
@@ -1506,8 +1509,6 @@ class ResPartner(models.Model):
                 sub_parts.append(wilaya_clean)
             if forme:
                 sub_parts.append(forme)
-            if statut_badge:
-                sub_parts.append(statut_badge)
             subtitle = (" · ".join(sub_parts) + local_tag).strip(" ·")
 
             results.append({
@@ -1524,8 +1525,9 @@ class ResPartner(models.Model):
                 "statut_cnrc": "RADIE" if is_radie else ("SUSPENDU" if is_suspendu else "ACTIF"),
                 "forme_juridique": forme,
                 "description": subtitle,
-                "statut_badge_clean": statut_badge,
-                "statut_label": statut_badge,
+                "statut_badge_clean": statut_label,
+                "statut_badge_style": statut_badge_style,
+                "statut_label": statut_label,
             })
 
         # When showing all entities, sort ACTIF first, followed by RADIÉ

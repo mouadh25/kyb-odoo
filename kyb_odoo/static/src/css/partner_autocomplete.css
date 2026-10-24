@@ -1,0 +1,15 @@
+/* KYB Enterprise Partner Autocomplete - Far-Right Discrete Badges */
+.o-autocomplete--dropdown-menu .ui-menu-item > a.ui-menu-item-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    padding: 6px 14px !important;
+}
+
+.o-autocomplete--dropdown-menu .ui-menu-item > a.ui-menu-item-wrapper > div {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+}

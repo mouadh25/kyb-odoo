@@ -27,16 +27,16 @@ except ImportError:
 _logger = logging.getLogger(__name__)
 
 # ──────────────── Official Algerian RC (Décret 05-468 & 18-112) Utilities ────────────────
-OFFICIAL_RC_REGEX = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])/00-(\d{1,10})([ABCDabcd])(\d{2})?$')
-COMPRESSED_RC_REGEX = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])([ABCDabcd])(\d{1,10})$')
-SPACED_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[-/ ]?\s*([ABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
-SPACED_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([ABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
-ARABIC_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[-/ ]?\s*([أابجدABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
-ARABIC_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-5]\d|6[0-9]|99|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([أابجدABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
+OFFICIAL_RC_REGEX = re.compile(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])/00-(\d{1,10})([ABCDabcd])(\d{2})?$')
+COMPRESSED_RC_REGEX = re.compile(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])([ABCDabcd])(\d{1,10})$')
+SPACED_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])\s*[-/ ]?\s*([ABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
+SPACED_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([ABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
+ARABIC_RC_REGEX_1 = re.compile(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])\s*[-/ ]?\s*([أابجدABCDabcd])\s*[-/ ]?\s*(\d{1,10})(?:\s*[-/ ]?\s*(\d{2}))?$')
+ARABIC_RC_REGEX_2 = re.compile(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])\s*[/ -]?\s*(?:00\s*[/ -]?\s*)?(\d{1,10})\s*[-/ ]?\s*([أابجدABCDabcd])(?:\s*[-/ ]?\s*(\d{2}))?$')
 ARABIC_TO_LATIN_CATEGORY = {'أ': 'A', 'ا': 'A', 'ب': 'B', 'ج': 'C', 'د': 'D'}
 
 def parse_algerian_rc(raw: Optional[str]) -> Optional[dict]:
-    """Parse any Algerian RC format into canonical components (69 Wilayas + Wilaya 00 National, Loi 26-06)."""
+    """Parse any Algerian RC format into canonical components (69 Wilayas + Wilaya 00 National, Loi 26-06 + 80-99 Pre-2000 Legacy)."""
     if not raw or not isinstance(raw, str):
         return None
     clean = raw.strip()
@@ -71,10 +71,11 @@ def parse_algerian_rc(raw: Optional[str]) -> Optional[dict]:
         return None
     try:
         w_num = int(wilaya)
-        if w_num != 99 and (w_num < 0 or w_num > 69):
+        if (w_num < 0 or w_num > 69) and (w_num < 80 or w_num > 99):
             return None
     except ValueError:
         return None
+
 
     padded_reg = register_number.zfill(7)
     return {
@@ -631,20 +632,25 @@ class ResPartner(models.Model):
     )
 
     # ── Legacy Backward Compatibility Aliases ──
-    conforme_nif = fields.Char(related="kyb_nif", readonly=False, string="NIF (Alias)")
-    conforme_rc = fields.Char(related="kyb_rc", readonly=False, string="Numéro RC (Alias)")
-    conforme_article_imposition = fields.Char(related="kyb_article_imposition", readonly=False, string="Article d'Imposition (Alias)")
-    conforme_nis = fields.Char(related="kyb_nis", readonly=False, string="NIS (Alias)")
-    conforme_statut_cnrc = fields.Selection(related="kyb_statut_cnrc", readonly=False, string="Statut CNRC (Alias)")
-    conforme_activite = fields.Char(related="kyb_activite", readonly=False, string="Activité (Alias)")
-    conforme_last_verified = fields.Datetime(related="kyb_last_verified", readonly=True, string="Dernière vérification (Alias)")
-    kyb_date_immatriculation = fields.Date(related="kyb_date_creation", readonly=False, string="Date d'Immatriculation (Alias)")
+    conforme_nif = fields.Char(related="kyb_nif", readonly=False, string="NIF (Alias)", tracking=False)
+    conforme_rc = fields.Char(related="kyb_rc", readonly=False, string="Numéro RC (Alias)", tracking=False)
+    conforme_article_imposition = fields.Char(related="kyb_article_imposition", readonly=False, string="Article d'Imposition (Alias)", tracking=False)
+    conforme_nis = fields.Char(related="kyb_nis", readonly=False, string="NIS (Alias)", tracking=False)
+    conforme_statut_cnrc = fields.Selection(related="kyb_statut_cnrc", readonly=False, string="Statut CNRC (Alias)", tracking=False)
+    conforme_activite = fields.Char(related="kyb_activite", readonly=False, string="Activité (Alias)", tracking=False)
+    conforme_last_verified = fields.Datetime(related="kyb_last_verified", readonly=True, string="Dernière vérification (Alias)", tracking=False)
+    kyb_date_immatriculation = fields.Date(related="kyb_date_creation", readonly=False, string="Date d'Immatriculation (Alias)", tracking=False)
+
 
     # ──────────────── Action Buttons & Onchange Handlers ───────────
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if isinstance(vals.get("country_id"), dict):
+                vals["country_id"] = vals["country_id"].get("id")
+            if isinstance(vals.get("state_id"), dict):
+                vals["state_id"] = vals["state_id"].get("id")
             if "kyb_rc" in vals or "company_registry" in vals:
                 rc_in = vals.get("kyb_rc") or vals.get("company_registry")
                 if rc_in:
@@ -661,6 +667,10 @@ class ResPartner(models.Model):
         return records
 
     def write(self, vals):
+        if isinstance(vals.get("country_id"), dict):
+            vals["country_id"] = vals["country_id"].get("id")
+        if isinstance(vals.get("state_id"), dict):
+            vals["state_id"] = vals["state_id"].get("id")
         if "kyb_rc" in vals or "company_registry" in vals:
             rc_in = vals.get("kyb_rc") or vals.get("company_registry")
             if rc_in:
@@ -715,18 +725,17 @@ class ResPartner(models.Model):
         for partner in self:
             if not hasattr(partner, "message_post"):
                 continue
-            # Strict Chatter Deduplication Guard: Never post duplicate audit logs on the same partner
+            # Strict Chatter Deduplication Guard: Keep a single fresh institutional card with complete details
             try:
-                existing_count = self.env["mail.message"].sudo().search_count([
+                old_cards = self.env["mail.message"].sudo().search([
                     ("model", "=", "res.partner"),
                     ("res_id", "=", partner.id),
                     ("body", "ilike", "%Vérification KYB%"),
                 ])
-                if existing_count > 0:
-                    _logger.info("KYB audit card already exists on partner #%s (%d entries) — skipping duplicate", partner.id, existing_count)
-                    continue
+                if old_cards:
+                    old_cards.unlink()
             except Exception as e_dedup:
-                _logger.warning("KYB chatter deduplication check failed on partner #%s: %s", partner.id, e_dedup)
+                _logger.warning("KYB chatter cleanup warning on partner #%s: %s", partner.id, e_dedup)
 
             statut = (partner.kyb_statut_cnrc or "ACTIF").upper()
             is_radie = "RAD" in statut or "مشطب" in statut
@@ -1635,7 +1644,7 @@ class ResPartner(models.Model):
                         rc_number=rc_cand,
                         nif=nif_cand,
                         raison_sociale=name_cand,
-                        force_live=True if not data else False,
+                        force_live=True if (not data or not data.get("nif")) else False,
                     )
                     if isinstance(enrich_resp, dict) and enrich_resp.get("entity"):
                         enriched_entity = enrich_resp["entity"]

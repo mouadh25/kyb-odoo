@@ -46,6 +46,14 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
   Streamlined asset bundle declarations and eliminated redundant template overrides to ensure clean CSS/OWL compilation and seamless cross-version compatibility across Odoo 16.0–20.0.
 
 ### Fixed
+* **Pre-2000 Algerian Trade Register (RC) Recognition (Wilayas 80–99):**
+  Extended the Trade Register validator across the thick core and connector to accept historic pre-2000 Algerian business registrations carrying Wilaya codes 80 to 99 (e.g. `98B0102835` / `98/00-0102835B`), enabling instantaneous autocomplete and certification for historic commercial enterprises.
+* **Semantic Versioning Telemetry & False Update Suppression:**
+  Replaced string inequality comparisons with integer-tuple semantic comparisons (`tuple(installed) >= tuple(latest)`) across the sovereign Gateway and Odoo Settings models, eliminating spurious update prompts when running the current release.
+* **Authoritative Chatter Audit Card In-Place Refresh:**
+  Replaced suppression guards with in-place message refresh, ensuring that when a counterparty is fully enriched from an initial autocomplete skeleton, the institutional audit card in the chatter is updated immediately with all certified fiscal attributes (NIF, NIS, RC Décret 05-468, Capital Social, Date d'Immatriculation, Legal Representative, NAE Activities).
+* **Defensive Relational Type Adaptation:**
+  Added defensive unwrapping for relational Many2one dictionaries in `res.partner` ORM hooks (`create` and `write`) to safeguard PostgreSQL foreign keys against nested dictionary adaptations.
 * **Cross-Version Client Serialization Stabilization:**
   Resolved client-side date serialization constraints during counterparty selection on modern web runtimes (Odoo 20.0). Dates are written securely via server-side ORM methods.
 * **Multi-Version Universal Compatibility:**

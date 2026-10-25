@@ -185,12 +185,18 @@ class ResConfigSettings(models.TransientModel):
         import re
         for rec in self:
             mod = self.env["ir.module.module"].sudo().search([("name", "=", "kyb_odoo")], limit=1)
-            inst = mod.installed_version if mod and mod.installed_version else "2.0.0"
+            inst = mod.installed_version if mod and mod.installed_version else "2.0.4"
             rec.kyb_installed_version = inst
-            latest = rec.kyb_latest_version or "2.0.0"
+            latest = rec.kyb_latest_version or inst
             inst_clean = re.sub(r'^\d+\.0\.', '', str(inst)).strip()
             latest_clean = re.sub(r'^\d+\.0\.', '', str(latest)).strip()
-            rec.kyb_update_available = bool(latest_clean and inst_clean and inst_clean != latest_clean)
+            try:
+                i_tuple = tuple(int(x) for x in inst_clean.split('.') if x.isdigit())
+                l_tuple = tuple(int(x) for x in latest_clean.split('.') if x.isdigit())
+                rec.kyb_update_available = bool(l_tuple > i_tuple)
+            except Exception:
+                rec.kyb_update_available = False
+
 
     def _gather_instance_telemetry(self):
         """Gathers aggregate client instance metadata for sovereign fleet observability (Loi 25-11 compliant)."""
@@ -328,20 +334,31 @@ class ResConfigSettings(models.TransientModel):
                 changelog = data.get("changelog") or ""
                 has_update = data.get("has_update", False)
                 force_upgrade = data.get("force_upgrade", False)
+                # Defensive semver comparison: only flag update if latest is strictly newer than installed
+                try:
+                    import re
+                    inst_c = re.sub(r'^\d+\.0\.', '', str(telemetry_data["connector_version"])).strip()
+                    latest_c = re.sub(r'^\d+\.0\.', '', str(latest)).strip()
+                    i_tuple = tuple(int(x) for x in inst_c.split('.') if x.isdigit())
+                    l_tuple = tuple(int(x) for x in latest_c.split('.') if x.isdigit())
+                    really_has_update = bool(has_update and (l_tuple > i_tuple))
+                except Exception:
+                    really_has_update = False
 
                 _set_config_param(self.env, "kyb.latest_version", latest)
-                _set_config_param(self.env, "kyb.update_available", str(has_update).lower())
+                _set_config_param(self.env, "kyb.update_available", str(really_has_update).lower())
                 _set_config_param(self.env, "kyb.force_upgrade", str(force_upgrade).lower())
                 if changelog:
                     _set_config_param(self.env, "kyb.changelog", changelog)
                 _set_config_param(self.env, "kyb.last_telemetry_sync", fields.Datetime.now())
 
-                if has_update:
+                if really_has_update:
                     msg = _("Nouvelle version %s disponible ! Cliquez sur 'Mettre à jour maintenant'.") % latest
                     msg_type = "warning"
                 else:
                     msg = _("Votre connecteur KYB est parfaitement à jour (v%s).") % telemetry_data["connector_version"]
                     msg_type = "success"
+
 
                 return {
                     "type": "ir.actions.client",

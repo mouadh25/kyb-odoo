@@ -738,11 +738,21 @@ class ResPartner(models.Model):
                 _logger.warning("KYB chatter cleanup warning on partner #%s: %s", partner.id, e_dedup)
 
             statut = (partner.kyb_statut_cnrc or "ACTIF").upper()
-            is_radie = "RAD" in statut or "مشطب" in statut
-            badge_color = "#ef4444" if is_radie else "#10b981"
-            badge_text = "RADIÉ" if is_radie else "ACTIF"
+            if "RAD" in statut or "مشطب" in statut:
+                badge_text = "RADIÉ"
+                badge_color = "#ef4444"
+            elif "SUSP" in statut or "معلق" in statut:
+                badge_text = "SUSPENDU"
+                badge_color = "#f59e0b"
+            elif "NON" in statut or "INTROUVABLE" in statut:
+                badge_text = "NON TROUVÉ"
+                badge_color = "#71717a"
+            else:
+                badge_text = "ACTIF"
+                badge_color = "#10b981"
 
             rows = []
+            rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; width: 38%;">{_("Statut Registre")} :</td><td style="padding: 2px 0; font-weight: 600; color: {badge_color};">{badge_text}</td></tr>')
             if partner.name:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; width: 38%;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{partner.name}</td></tr>')
             if partner.kyb_nif:
@@ -780,7 +790,7 @@ class ResPartner(models.Model):
                 '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; border: 1px solid #e4e4e7; padding: 12px 14px; background: #fafafa; border-radius: 8px; margin: 6px 0;">'
                 f'<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">'
                 f'<strong style="color: #18181b; font-size: 13px; font-weight: 600;">{_("Vérification KYB")}</strong>'
-                f'<span style="background: {badge_color}; color: white; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600;">{badge_text}</span>'
+                f'<span style="background: {badge_color}; color: white; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; display: inline-block;">{badge_text}</span>'
                 f'</div>'
                 f'<table style="width: 100%; font-size: 12px; border-collapse: collapse;">{rows_html}</table>'
                 f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid #e4e4e7; padding-top: 4px;">'
@@ -788,7 +798,7 @@ class ResPartner(models.Model):
                 f'</div>'
                 '</div>'
             )
-            partner.message_post(body=Markup(body), message_type="notification", subtype_xmlid="mail.mt_note")
+            partner.message_post(body=Markup(body), message_type="comment", subtype_xmlid="mail.mt_comment")
 
     def enrich_company_message_post(self, data):
         """
@@ -1153,6 +1163,11 @@ class ResPartner(models.Model):
             elif self.kyb_nif and not self.vat:
                 self.vat = self.kyb_nif
 
+            if is_pp:
+                self.is_company = False
+                if "company_type" in self._fields:
+                    self.company_type = "person"
+
             date_crea = data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")
             norm_crea = _normalize_algerian_date(date_crea)
             if norm_crea:
@@ -1302,6 +1317,10 @@ class ResPartner(models.Model):
                 if "company_registry" in self._fields and self.company_registry:
                     write_vals["company_registry"] = self.company_registry
                 self.write(write_vals)
+                if is_pp:
+                    self.write({"is_company": False})
+                elif is_pm:
+                    self.write({"is_company": True})
                 self._post_kyb_audit_log()
 
             # ── Duplicate Fiscal Identifier (NIF) Guard ──

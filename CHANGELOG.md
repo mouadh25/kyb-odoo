@@ -15,11 +15,35 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.4` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.4` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.4` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.4` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.6` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.6` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.6` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.6` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.6` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+
+---
+
+## [2.0.6] - 2026-10-26
+
+### Added
+* **Chatter Audit Card Publication Visibility (`mail.mt_comment`):**
+  Switched audit message subtype from `mail.mt_note` to `mail.mt_comment` (`message_type="comment"`), guaranteeing audit card visibility when filtering chatter by standard discussions or "Messages".
+* **Multi-Status Institutional Badges & Explicit Status Row:**
+  Extended status badge styling across 4 distinct legal states: `ACTIF` (🟢 #10b981), `RADIÉ` (🔴 #ef4444), `SUSPENDU` (🟠 #f59e0b), and `NON TROUVÉ` (⚪ #71717a). Added a dedicated, prominent `Statut Registre : <STATUS>` key-value row at the top of the tabular card.
+* **Auto-Entrepreneur 20-Digit NIF Support (Loi 22-23):**
+  Full transparent resolution of auto-entrepreneur 20-digit NIFs with automatic fallback to 15-digit root and zero RC requirement.
+* **Pre-2022 Wilaya 00 Corporate NIF Compatibility:**
+  Guaranteed live DGI validation for authentic enterprises registered prior to 2022 in Wilaya 00 (e.g. `000016...`).
+
+---
+
+## [2.0.5] - 2026-10-26
+
+### Fixed
+* **Odoo 20 Personne Physique Persona State Integrity (`is_company = False`):**
+  Resolved an Odoo 20 framework quirk where assigning a value to the standard `vat` field triggered native partner compute/inverse logic that reset `is_company` to `True`. Implemented strict post-write re-assertion ensuring sole proprietorships, individual traders, artisans, and auto-entrepreneurs maintain individual status (`is_company = False` / Particulier) in compliance with Décret 05-468 and Law 18-07.
+* **Auto-Entrepreneur & Artisan Direct Resolution Alignment:**
+  Seamlessly synchronized with the Thick Core's direct DGI certification fallback for individual taxpayers exempt from commercial registration (Loi 22-23 Art. 4). Fiches are populated with `statut_cnrc: ACTIF`, `forme_juridique: Personne Physique`, `capital_social: N/A (Patrimoine Individuel)`, and `representant_legal: [Nom Prénom] (Titulaire)`.
 
 ---
 

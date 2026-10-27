@@ -15,13 +15,23 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.6` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.6` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.6` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.6` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.6` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.7` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.7` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.7` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.7` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.7` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
 
 ---
+
+## [2.0.7] - 2026-10-27
+
+### Fixed
+* **Chatter Deduplication — Suppressed ORM Field-Diff Tracking Messages:**
+  Both `_do_kyb_resolve` write paths now use `with_context(tracking_disable=True)` to prevent Odoo's automatic field-tracking engine from posting a raw `None → value` diff message alongside the institutional KYB card. The chatter now contains exactly **one** entry per verification: the formatted institutional KYB audit card.
+* **Removed Redundant `Statut Registre` Row from Chatter Card:**
+  The first table row inside the `_post_kyb_audit_log` HTML card duplicated the status badge already visible in the card header (`Vérification KYB | ACTIF`). Row removed — status badge in the header is the single authoritative status indicator.
+* **Removed Duplicate `Verify KYB` Header Button:**
+  The form-level `<header>` button (appearing above the sheet) duplicated the button already present inside the dedicated **KYB — Fiscal Verification** tab. Removed the header button; the tab button remains the sole entry point.
 
 ## [2.0.6] - 2026-10-26
 

@@ -8,16 +8,6 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
-            <!-- Form Header Action Button -->
-            <xpath expr="//sheet" position="before">
-                <header>
-                    <button name="action_verify_kyb"
-                            type="object"
-                            string="Verify KYB"
-                            class="btn btn-primary"
-                            icon="fa-shield"/>
-                </header>
-            </xpath>
 
             <!-- Dedicated KYB Tab -->
             <xpath expr="//page[@name='internal_notes']" position="before">

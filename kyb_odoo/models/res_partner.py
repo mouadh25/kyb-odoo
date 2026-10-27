@@ -751,8 +751,7 @@ class ResPartner(models.Model):
                 badge_text = "ACTIF"
                 badge_color = "#10b981"
 
-            rows = []
-            rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; width: 38%;">{_("Statut Registre")} :</td><td style="padding: 2px 0; font-weight: 600; color: {badge_color};">{badge_text}</td></tr>')
+            rows = []  # Statut row removed — badge in card header already conveys ACTIF/RADIÉ/SUSPENDU
             if partner.name:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; width: 38%;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{partner.name}</td></tr>')
             if partner.kyb_nif:
@@ -905,7 +904,9 @@ class ResPartner(models.Model):
                         _logger.warning("Defensive date correction failed: %s", e_inv)
 
             if vals:
-                partner.write(vals)
+                # tracking_disable=True: suppress Odoo ORM field-diff chatter; the
+                # institutional KYB card from _post_kyb_audit_log() is the sole audit trail.
+                partner.with_context(tracking_disable=True).write(vals)
 
             partner._post_kyb_audit_log()
 
@@ -1316,11 +1317,13 @@ class ResPartner(models.Model):
                 }
                 if "company_registry" in self._fields and self.company_registry:
                     write_vals["company_registry"] = self.company_registry
-                self.write(write_vals)
+                # tracking_disable=True: suppress Odoo ORM field-diff chatter; the
+                # institutional KYB card from _post_kyb_audit_log() is the sole audit trail.
+                self.with_context(tracking_disable=True).write(write_vals)
                 if is_pp:
-                    self.write({"is_company": False})
+                    self.with_context(tracking_disable=True).write({"is_company": False})
                 elif is_pm:
-                    self.write({"is_company": True})
+                    self.with_context(tracking_disable=True).write({"is_company": True})
                 self._post_kyb_audit_log()
 
             # ── Duplicate Fiscal Identifier (NIF) Guard ──

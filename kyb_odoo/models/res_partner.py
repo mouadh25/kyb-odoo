@@ -779,9 +779,11 @@ class ResPartner(models.Model):
                 rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_forme_juridique}</td></tr>')
             if partner.kyb_date_creation:
                 label_immat = _("Date d'Immatriculation")
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_date_creation}</td></tr>')
+                d_crea_val = partner.kyb_date_creation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_creation, "strftime") else str(partner.kyb_date_creation)
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{d_crea_val}</td></tr>')
             if partner.kyb_date_radiation:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #ef4444;">{partner.kyb_date_radiation}</td></tr>')
+                d_rad_val = partner.kyb_date_radiation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_radiation, "strftime") else str(partner.kyb_date_radiation)
+                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #ef4444;">{d_rad_val}</td></tr>')
             if partner.kyb_capital_social:
                 rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
@@ -812,7 +814,9 @@ class ResPartner(models.Model):
                 f'</div>'
                 '</div>'
             )
-            partner.message_post(body=Markup(body), message_type="comment", subtype_xmlid="mail.mt_comment")
+            # Chatter author attribution: assign message to the active session user (e.g. Administrator)
+            author_id = self.env.user.partner_id.id if self.env.user and self.env.user.partner_id else False
+            partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_comment")
 
     def enrich_company_message_post(self, data):
         """
@@ -855,6 +859,16 @@ class ResPartner(models.Model):
                             vals["kyb_date_creation"] = norm_crea
                     except Exception:
                         pass
+                # Fallback: derive registration year from RC if exact date is still missing
+                if not vals.get("kyb_date_creation") and partner.kyb_rc:
+                    rc_clean = re.sub(r"\s+", "", str(partner.kyb_rc or ""))
+                    m_suf = re.search(r"[A-Za-z](\d{2})$", rc_clean)
+                    m_pref = re.match(r"^(\d{2})[A-Za-z]\d{4,8}$", rc_clean)
+                    yr_2d = m_suf.group(1) if m_suf else (m_pref.group(1) if m_pref else None)
+                    if yr_2d:
+                        yr_full = int(yr_2d)
+                        yr_4d = 1900 + yr_full if yr_full >= 50 else 2000 + yr_full
+                        vals["kyb_date_creation"] = f"{yr_4d}-01-01"
 
             # 2. Sync Status and Date de Radiation
             incoming_statut = (data.get("statut_cnrc") or data.get("statutCnrc") or data.get("statut") or "") if isinstance(data, dict) else ""

@@ -26,8 +26,12 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 ## [2.0.7] - 2026-10-27
 
 ### Fixed
-* **Chatter Deduplication — Suppressed ORM Field-Diff Tracking Messages:**
-  Both `_do_kyb_resolve` write paths now use `with_context(tracking_disable=True)` to prevent Odoo's automatic field-tracking engine from posting a raw `None → value` diff message alongside the institutional KYB card. The chatter now contains exactly **one** entry per verification: the formatted institutional KYB audit card.
+* **Eliminated Card-Inside-a-Card Chatter Nested Styling:**
+  Removed the redundant outer box border (`border: 1px solid #e4e4e7`), background (`#fafafa`), and rounded corners (`border-radius: 8px`) from `_post_kyb_audit_log`. The statutory KYB audit log now renders seamlessly inside Odoo's native chatter message container instead of appearing as a nested card inside a card.
+* **Chatter Deduplication — Single Sovereign KYB Card Guarantee:**
+  `_post_kyb_audit_log` now automatically purges any redundant `Contact créé` notification or ORM field-tracking diffs on the partner, leaving exactly **one** pristine institutional KYB audit card as the sole chatter entry.
+* **Suppressed ORM Field-Diff Tracking & Auto Creation Logs:**
+  Added `mail_create_nolog=True`, `mail_notrack=True`, and `tracking_disable=True` on both partner creation and update write paths to prevent Odoo from posting raw `None → value` diff messages.
 * **Removed Redundant `Statut Registre` Row from Chatter Card:**
   The first table row inside the `_post_kyb_audit_log` HTML card duplicated the status badge already visible in the card header (`Vérification KYB | ACTIF`). Row removed — status badge in the header is the single authoritative status indicator.
 * **Removed Duplicate `Verify KYB` Header Button:**

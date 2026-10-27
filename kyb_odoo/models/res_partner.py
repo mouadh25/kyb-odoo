@@ -738,11 +738,14 @@ class ResPartner(models.Model):
             if not hasattr(partner, "message_post"):
                 continue
             # Strict Chatter Deduplication Guard: Keep a single fresh institutional card with complete details
+            # Purges redundant Contact créé, tracking diffs, and old cards so exactly one clean KYB record remains
             try:
                 old_cards = self.env["mail.message"].sudo().search([
                     ("model", "=", "res.partner"),
                     ("res_id", "=", partner.id),
-                    ("body", "ilike", "%Vérification KYB%"),
+                    "|", ("body", "ilike", "%Vérification KYB%"),
+                    "|", ("body", "ilike", "%Contact créé%"),
+                    ("message_type", "=", "tracking"),
                 ])
                 if old_cards:
                     old_cards.unlink()
@@ -798,8 +801,8 @@ class ResPartner(models.Model):
             now_dt = fields.Datetime.now()
             now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
-                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; border: 1px solid #e4e4e7; padding: 12px 14px; background: #fafafa; border-radius: 8px; margin: 6px 0;">'
-                f'<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">'
+                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; margin: 2px 0;">'
+                f'<div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid #e4e4e7; margin-bottom: 8px;">'
                 f'<strong style="color: #18181b; font-size: 13px; font-weight: 600;">{_("Vérification KYB")}</strong>'
                 f'<span style="background: {badge_color}; color: white; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; display: inline-block;">{badge_text}</span>'
                 f'</div>'

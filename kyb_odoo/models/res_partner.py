@@ -660,7 +660,19 @@ class ResPartner(models.Model):
                         vals["company_registry"] = fmt_rc
             if (vals.get("kyb_nif") or vals.get("kyb_rc")) and vals.get("kyb_statut_cnrc") and not vals.get("kyb_last_verified"):
                 vals["kyb_last_verified"] = fields.Datetime.now()
-        records = super().create(vals_list)
+        # Determine if this batch has KYB-verified records before creation
+        has_kyb = any((v.get("kyb_nif") or v.get("kyb_rc")) and v.get("kyb_statut_cnrc") for v in vals_list)
+
+        if has_kyb:
+            # mail_create_nolog=True: suppress Odoo's built-in "Contact créé" log message.
+            # The institutional KYB card from _post_kyb_audit_log() is the sole chatter entry.
+            # mail_notrack=True: belt-and-suspenders — suppress any residual field tracking on creation.
+            records = super(ResPartner, self.with_context(
+                mail_create_nolog=True, mail_notrack=True
+            )).create(vals_list)
+        else:
+            records = super().create(vals_list)
+
         for record in records:
             if (record.kyb_nif or record.kyb_rc) and record.kyb_statut_cnrc:
                 record._post_kyb_audit_log()

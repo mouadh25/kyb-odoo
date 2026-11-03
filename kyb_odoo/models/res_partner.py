@@ -815,7 +815,8 @@ class ResPartner(models.Model):
                 '</div>'
             )
             # Chatter author attribution: assign message to the active session user (e.g. Administrator)
-            author_id = self.env.user.partner_id.id if self.env.user and self.env.user.partner_id else False
+            user_partner = getattr(getattr(self.env, "user", None), "partner_id", None)
+            author_id = user_partner.id if user_partner else False
             partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_comment")
 
     def enrich_company_message_post(self, data):
@@ -1064,6 +1065,8 @@ class ResPartner(models.Model):
         return self._do_kyb_resolve(cleaned)
 
     def _do_kyb_resolve(self, query: str):
+        if isinstance(self.id, int) and self.id > 0:
+            self = self.with_context(tracking_disable=True, mail_notrack=True)
         profile = None
         client = None
         try:

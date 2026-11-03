@@ -15,13 +15,28 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.7` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.7` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.7` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.7` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.7` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.8` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.8` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.8` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.8` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.8` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
 
 ---
+
+## [2.0.8] - 2026-11-03
+
+### Added
+* **Non-Blocking Commercial Risk & État 104 Compliance Alerts for Customer Invoices (`out_invoice` / `out_refund`):**
+  * Automatically evaluates `kyb_compliance_status` upon `account.move.create()` and `write()` so invoices generated from Sales Orders (`sale.order` -> *Créer une facture*) or Purchase Orders immediately display their compliance status (`compliant`, `warning`, `non_compliant`) without requiring manual audit button clicks.
+  * Displays a non-blocking warning dialog (`⚠️ Alerte Risque Commercial (Client Radié)`) when selecting a deregistered (`RADIE`) or suspended (`SUSPENDU`) customer on a Customer Invoice via `@api.onchange`.
+  * Performs 24-hour JIT verification and posts a non-blocking commercial credit risk & **État 104 (Art. 183 ter CIDTA)** warning note (`mail.mt_note`) in the invoice Chatter upon `action_post()` for deregistered customers while keeping confirmation non-blocking (output VAT remains collectible).
+  * Preserves strict configurable blocking (`strict_block` / `soft_warn`) on Purchase Bills (`in_invoice` / `in_refund`) under Articles 169 & 176 CIDTA and Article 30 CTCA.
+* **In-Memory Python Hot-Reload during 1-Click Upgrades (`migrations/0.0.0/pre-migrate.py`):**
+  * Automatically purges cached `odoo.addons.kyb_odoo` modules from `sys.modules` during `button_immediate_upgrade()` so 1-click in-app updates apply Python model changes immediately without requiring a container restart.
+
+### Fixed
+* **Suppressed Duplicate ORM Field-Diff Tracking on Partner Re-Verification:**
+  * Applied `tracking_disable=True` and `mail_notrack=True` at the entry of `ResPartner._do_kyb_resolve()` for existing records so re-verifying a partner posts only the institutional KYB card.
 
 ## [2.0.7] - 2026-10-27
 

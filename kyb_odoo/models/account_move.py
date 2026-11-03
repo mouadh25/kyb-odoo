@@ -12,6 +12,10 @@ import datetime
 import logging
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+try:
+    from markupsafe import Markup
+except ImportError:
+    Markup = lambda s: s
 
 try:
     from .res_partner import _get_config_param, _get_config_bool
@@ -81,6 +85,88 @@ class AccountMove(models.Model):
         readonly=True,
     )
 
+    @staticmethod
+    def _to_date(val):
+        """Safely coerce a Date field value (datetime.date, datetime.datetime, or ISO str) to datetime.date."""
+        if not val:
+            return None
+        if isinstance(val, datetime.datetime):
+            return val.date()
+        if isinstance(val, datetime.date):
+            return val
+        if hasattr(fields.Date, "to_date"):
+            try:
+                return fields.Date.to_date(val)
+            except Exception:
+                pass
+        try:
+            return datetime.date.fromisoformat(str(val)[:10])
+        except Exception:
+            return None
+
+    def _is_sale_doc(self):
+        """True if move is a customer invoice/refund/receipt (safe fallback when running outside full account.move)."""
+        if hasattr(self, "is_sale_document"):
+            return self.is_sale_document(include_receipts=True)
+        return (getattr(self, "move_type", None) or "in_invoice") in ("out_invoice", "out_refund", "out_receipt")
+
+    def _is_purchase_doc(self):
+        """True if move is a supplier bill/refund/receipt (safe fallback when running outside full account.move)."""
+        if hasattr(self, "is_purchase_document"):
+            return self.is_purchase_document(include_receipts=True)
+        return (getattr(self, "move_type", None) or "in_invoice") in ("in_invoice", "in_refund", "in_receipt")
+
+    def _is_invoice_doc(self):
+        """True if move is a sale or purchase invoice/refund/receipt."""
+        if hasattr(self, "is_invoice"):
+            return self.is_invoice(include_receipts=True)
+        return (getattr(self, "move_type", None) or "in_invoice") in (
+            "out_invoice", "out_refund", "out_receipt",
+            "in_invoice", "in_refund", "in_receipt",
+        )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Automatically evaluate KYB compliance when invoices are created (e.g. from Sales or Purchase Orders)."""
+        moves = super().create(vals_list)
+        audit_enabled = _get_config_bool(self.env, "kyb.invoice_audit_enabled", default=True)
+        if audit_enabled:
+            for move, vals in zip(moves, vals_list):
+                if (
+                    move.partner_id
+                    and vals.get("kyb_compliance_status") not in ("compliant", "warning", "non_compliant")
+                    and move._is_invoice_doc()
+                ):
+                    move.with_context(
+                        tracking_disable=True,
+                        mail_notrack=True,
+                        kyb_skip_invoice_audit=True,
+                    )._audit_temporal_compliance()
+        return moves
+
+    def write(self, vals):
+        """Re-evaluate KYB compliance when partner_id or invoice_date is modified on an existing invoice."""
+        res = super().write(vals)
+        if (
+            ("partner_id" in vals or "invoice_date" in vals)
+            and "kyb_compliance_status" not in vals
+            and not self.env and False or (
+                ("partner_id" in vals or "invoice_date" in vals)
+                and "kyb_compliance_status" not in vals
+                and not (getattr(self.env, "context", None) or {}).get("kyb_skip_invoice_audit")
+            )
+        ):
+            audit_enabled = _get_config_bool(self.env, "kyb.invoice_audit_enabled", default=True)
+            if audit_enabled:
+                for move in self:
+                    if move.partner_id and move._is_invoice_doc():
+                        move.with_context(
+                            tracking_disable=True,
+                            mail_notrack=True,
+                            kyb_skip_invoice_audit=True,
+                        )._audit_temporal_compliance()
+        return res
+
     @api.model
     def _is_fresh_24h(self, partner):
         """
@@ -111,6 +197,17 @@ class AccountMove(models.Model):
     def _onchange_kyb_temporal_compliance(self):
         """Re-evaluate fiscal compliance when partner or invoice date changes."""
         self._audit_temporal_compliance()
+        if (
+            self.partner_id
+            and self._is_sale_doc()
+            and self.kyb_compliance_status in ("non_compliant", "warning")
+        ):
+            return {
+                "warning": {
+                    "title": _("⚠️ Alerte Risque Commercial (Client Radié)"),
+                    "message": self.kyb_compliance_message,
+                }
+            }
 
     def action_verify_kyb_compliance(self):
         """Header button action and bulk action to audit temporal fiscal compliance."""
@@ -126,10 +223,16 @@ class AccountMove(models.Model):
                 continue
 
             partner = move.partner_id
+            has_ident = bool(
+                partner.kyb_nif
+                or partner.kyb_rc
+                or partner.vat
+                or (partner.company_registry if "company_registry" in partner._fields else False)
+            )
             # 24-Hour Rolling Just-In-Time Freshness Rule:
             # If partner has NIF/RC and has NOT been verified within the last 24h, re-resolve live legal standing.
             # If already verified within 24h, reuse local verified profile (0 credits, <1ms).
-            if (partner.kyb_nif or partner.kyb_rc) and not self._is_fresh_24h(partner):
+            if has_ident and not self._is_fresh_24h(partner):
                 try:
                     partner.action_verify_kyb()
                 except Exception as e:
@@ -150,6 +253,8 @@ class AccountMove(models.Model):
             status_label = dict(self._fields["kyb_compliance_status"].selection).get(
                 self.kyb_compliance_status, self.kyb_compliance_status
             )
+            if self._is_sale_doc() and self.kyb_compliance_status == "non_compliant":
+                status_label = _("Non Conforme (Client Radié — Risque Commercial)")
             msg_type = (
                 "danger"
                 if self.kyb_compliance_status == "non_compliant"
@@ -174,7 +279,7 @@ class AccountMove(models.Model):
         summary_msg = (
             _("Audit en masse terminé (%(total)d factures auditées) :\n"
               "• %(compliant)d Conforme(s) (Actifs)\n"
-              "• %(non_compliant)d Non Conforme(s) (Fournisseurs Radiés - Risque fiscal)\n"
+              "• %(non_compliant)d Non Conforme(s) (Tiers Radiés - Risque fiscal/commercial)\n"
               "• %(warning)d Suspect(s) / Avertissement(s)") % {
                 "total": len(self),
                 "compliant": compliant_count,
@@ -194,80 +299,118 @@ class AccountMove(models.Model):
         }
 
     def _audit_temporal_compliance(self):
-        """Core compliance rule evaluator."""
-        partner = self.partner_id
-        if not partner:
-            self.kyb_compliance_status = "unverified"
-            self.kyb_compliance_message = False
-            return
+        """Core compliance rule evaluator for both Supplier Bills and Customer Invoices."""
+        for move in self.with_context(kyb_skip_invoice_audit=True):
+            partner = move.partner_id
+            if not partner:
+                move.kyb_compliance_status = "unverified"
+                move.kyb_compliance_message = False
+                continue
 
-        statut = (partner.kyb_statut_cnrc or "INCONNU").upper()
-        inv_date = self.invoice_date or fields.Date.context_today(self)
+            statut = (partner.kyb_statut_cnrc or "INCONNU").upper()
+            inv_date = move.invoice_date or fields.Date.context_today(move)
+            is_sale = move._is_sale_doc()
 
-        if "RAD" in statut or "مشطب" in statut:
-            rad_date = partner.kyb_date_radiation
-            if rad_date and inv_date and inv_date > rad_date:
-                self.kyb_compliance_status = "non_compliant"
-                self.kyb_tax_deductible = False
-                self.kyb_audit_date = fields.Datetime.now()
-                self.kyb_compliance_message = (
-                    f"⚠️ Signalement Registre Officiel (Fournisseur Radié) :\n"
-                    f"Le fournisseur '{partner.name}' est enregistré comme radié depuis le {rad_date}.\n"
-                    f"La présente facture est datée du {inv_date} (postérieurement à la date de radiation enregistrée).\n"
-                    f"Information : Selon les dispositions des Art. 169 & 176 CIDTA et Art. 30 CTCA, une vérification comptable préalable est recommandée."
+            if "RAD" in statut or "مشطب" in statut:
+                rad_date = partner.kyb_date_radiation
+                inv_date_obj = self._to_date(inv_date)
+                rad_date_obj = self._to_date(rad_date)
+                if rad_date_obj and inv_date_obj and inv_date_obj > rad_date_obj:
+                    move.kyb_compliance_status = "non_compliant"
+                    move.kyb_tax_deductible = False
+                    move.kyb_audit_date = fields.Datetime.now()
+                    if is_sale:
+                        move.kyb_compliance_message = (
+                            f"⚠️ Alerte Risque Commercial (Client Radié) :\n"
+                            f"Le client '{partner.name}' est enregistré comme radié au registre officiel depuis le {rad_date}.\n"
+                            f"La présente facture de vente est datée du {inv_date} (postérieurement à la date de radiation enregistrée).\n"
+                            f"Information : La facturation reste autorisée (TVA collectée exigible), mais il est recommandé d'exiger un règlement au comptant et de vérifier le dossier pour l'État 104 (Art. 183 ter CIDTA)."
+                        )
+                    else:
+                        move.kyb_compliance_message = (
+                            f"⚠️ Signalement Registre Officiel (Fournisseur Radié) :\n"
+                            f"Le fournisseur '{partner.name}' est enregistré comme radié depuis le {rad_date}.\n"
+                            f"La présente facture est datée du {inv_date} (postérieurement à la date de radiation enregistrée).\n"
+                            f"Information : Selon les dispositions des Art. 169 & 176 CIDTA et Art. 30 CTCA, une vérification comptable préalable est recommandée."
+                        )
+                else:
+                    move.kyb_compliance_status = "warning"
+                    move.kyb_tax_deductible = False
+                    move.kyb_audit_date = fields.Datetime.now()
+                    if is_sale:
+                        move.kyb_compliance_message = (
+                            f"⚠️ Client Signalé Radié (Registre Officiel) :\n"
+                            f"Le client '{partner.name}' est enregistré comme radié (Date radiation : {rad_date or 'Non renseignée'}).\n"
+                            f"Recommandation : Vérifiez la solvabilité du client (paiement au comptant) et la concordance État 104."
+                        )
+                    else:
+                        move.kyb_compliance_message = (
+                            f"⚠️ Fournisseur Signalé Radié (Registre Officiel) :\n"
+                            f"Le partenaire '{partner.name}' est enregistré comme radié (Date radiation : {rad_date or 'Non renseignée'}).\n"
+                            f"Veuillez vérifier la situation auprès de vos services comptables."
+                        )
+            elif "ACT" in statut or "نشط" in statut:
+                move.kyb_compliance_status = "compliant"
+                move.kyb_tax_deductible = True
+                move.kyb_audit_date = fields.Datetime.now()
+                role_label = "Client" if is_sale else "Fournisseur"
+                move.kyb_compliance_message = (
+                    f"✅ {role_label} Actif au Registre :\n"
+                    f"Le partenaire '{partner.name}' est enregistré comme actif au registre du commerce (NIF: {partner.kyb_nif or partner.vat or 'Renseigné'})."
+                )
+            elif "SUSP" in statut:
+                move.kyb_compliance_status = "warning"
+                move.kyb_tax_deductible = False
+                move.kyb_audit_date = fields.Datetime.now()
+                move.kyb_compliance_message = (
+                    f"⚠️ Registre Suspendu :\n"
+                    f"L'activité du partenaire '{partner.name}' est suspendue auprès du CNRC."
                 )
             else:
-                self.kyb_compliance_status = "warning"
-                self.kyb_tax_deductible = False
-                self.kyb_audit_date = fields.Datetime.now()
-                self.kyb_compliance_message = (
-                    f"⚠️ Fournisseur Signalé Radié (Registre Officiel) :\n"
-                    f"Le partenaire '{partner.name}' est enregistré comme radié (Date radiation : {rad_date or 'Non renseignée'}).\n"
-                    f"Veuillez vérifier la situation auprès de vos services comptables."
+                move.kyb_compliance_status = "unverified"
+                move.kyb_tax_deductible = False
+                move.kyb_audit_date = False
+                move.kyb_compliance_message = (
+                    f"ℹ️ Non Vérifié :\n"
+                    f"Le partenaire '{partner.name}' n'a pas encore fait l'objet d'une vérification sur le registre KYB."
                 )
-        elif "ACT" in statut or "نشط" in statut:
-            self.kyb_compliance_status = "compliant"
-            self.kyb_tax_deductible = True
-            self.kyb_audit_date = fields.Datetime.now()
-            self.kyb_compliance_message = (
-                f"✅ Fournisseur Actif au Registre :\n"
-                f"Le partenaire '{partner.name}' est enregistré comme actif au registre du commerce (NIF: {partner.kyb_nif or partner.vat or 'Renseigné'})."
-            )
-        elif "SUSP" in statut:
-            self.kyb_compliance_status = "warning"
-            self.kyb_tax_deductible = False
-            self.kyb_audit_date = fields.Datetime.now()
-            self.kyb_compliance_message = (
-                f"⚠️ Registre Suspendu :\n"
-                f"L'activité du partenaire '{partner.name}' est suspendue auprès du CNRC."
-            )
-        else:
-            self.kyb_compliance_status = "unverified"
-            self.kyb_tax_deductible = False
-            self.kyb_audit_date = False
-            self.kyb_compliance_message = (
-                f"ℹ️ Non Vérifié :\n"
-                f"Le partenaire '{partner.name}' n'a pas encore fait l'objet d'une vérification sur le registre KYB."
-            )
 
     def action_post(self):
-        """Override action_post to enforce compliance policies on vendor invoices."""
+        """
+        Override action_post to enforce compliance policies:
+        - Purchase documents (Vendor Bills): Enforce configurable blocking_policy (strict_block or soft_warn)
+          per Articles 169 & 176 CIDTA and Article 30 CTCA.
+        - Sale documents (Customer Invoices): Perform JIT verification and post a non-blocking
+          Chatter warning note when billing a deregistered (radié) customer (credit risk & État 104 audit trail).
+        """
         audit_enabled = _get_config_bool(self.env, "kyb.invoice_audit_enabled", default=True)
         blocking_policy = _get_config_param(self.env, "kyb.invoice_blocking_policy", default="strict_block")
         unverified_policy = _get_config_param(self.env, "kyb.unverified_partner_policy", default="allow_warn")
 
         if audit_enabled:
             for move in self:
-                if move.is_invoice(include_receipts=True) and move.is_purchase_document(include_receipts=True):
-                    partner = move.partner_id
-                    if partner and (partner.kyb_nif or partner.kyb_rc) and not self._is_fresh_24h(partner):
-                        try:
-                            partner.action_verify_kyb()
-                        except Exception as e:
-                            _logger.warning("Partner JIT refresh failed during post: %s", e)
+                if not move._is_invoice_doc():
+                    continue
 
-                    move._audit_temporal_compliance()
+                partner = move.partner_id
+                has_ident = bool(
+                    partner and (
+                        partner.kyb_nif
+                        or partner.kyb_rc
+                        or partner.vat
+                        or (partner.company_registry if "company_registry" in partner._fields else False)
+                    )
+                )
+                if has_ident and not self._is_fresh_24h(partner):
+                    try:
+                        partner.action_verify_kyb()
+                    except Exception as e:
+                        _logger.warning("Partner JIT refresh failed during post: %s", e)
 
+                move._audit_temporal_compliance()
+
+                # Branch A: Purchase Documents (Vendor Bills / Refunds)
+                if move._is_purchase_doc():
                     # Policy 1: Non-Compliant / Radié Supplier
                     if move.kyb_compliance_status == "non_compliant":
                         if blocking_policy == "strict_block":
@@ -290,18 +433,19 @@ class AccountMove(models.Model):
                                 }
                             )
                         else:
+                            msg_html = (move.kyb_compliance_message or "").replace("\n", "<br/>")
                             move.message_post(
-                                body=(
+                                body=Markup(
                                     f"<div class='alert alert-danger'>"
                                     f"<strong>Signalement Registre Officiel (Fournisseur Radié - Réf. Art. 176 CIDTA) :</strong><br/>"
-                                    f"{move.kyb_compliance_message}"
+                                    f"{msg_html}"
                                     f"</div>"
                                 ),
                                 message_type="notification",
                                 subtype_xmlid="mail.mt_note",
                             )
 
-                    # Policy 2: Unverified Partner
+                    # Policy 2: Unverified Partner on Purchase Document
                     elif move.kyb_compliance_status == "unverified" and unverified_policy == "require_verify":
                         raise UserError(
                             _("⛔ VALIDATION BLOQUÉE : Le fournisseur '%(partner)s' n'a pas encore fait l'objet d'une vérification préalable KYB.\n"
@@ -309,7 +453,26 @@ class AccountMove(models.Model):
                             % {"partner": partner.name}
                         )
 
-        return super().action_post()
+                # Branch B: Sale Documents (Customer Invoices / Refunds) — Always Non-Blocking with Chatter Alert
+                elif move._is_sale_doc():
+                    if move.kyb_compliance_status in ("non_compliant", "warning") and partner and (
+                        "RAD" in (partner.kyb_statut_cnrc or "").upper()
+                        or "مشطب" in (partner.kyb_statut_cnrc or "")
+                        or "SUSP" in (partner.kyb_statut_cnrc or "").upper()
+                    ):
+                        msg_html = (move.kyb_compliance_message or "").replace("\n", "<br/>")
+                        move.message_post(
+                            body=Markup(
+                                f"<div class='alert alert-warning'>"
+                                f"<strong>Signalement Risque Commercial &amp; État 104 (Client Radié — Non-Bloquant) :</strong><br/>"
+                                f"{msg_html}"
+                                f"</div>"
+                            ),
+                            message_type="notification",
+                            subtype_xmlid="mail.mt_note",
+                        )
+
+        return super().action_post() if hasattr(super(), "action_post") else True
 
     # ──────────────── End-of-Month Global Audit (G50 Safety Net) ──────────────────
 

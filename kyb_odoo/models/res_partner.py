@@ -1443,7 +1443,8 @@ class ResPartner(models.Model):
                 self.state_id = False
 
             article = data.get("article_imposition") or data.get("articleImposition") or data.get("article_imp", "")
-            self.kyb_article_imposition = article or False
+            if article:
+                self.kyb_article_imposition = article
 
             nis = data.get("nis") or data.get("numero_nis", "")
             self.kyb_nis = nis or False

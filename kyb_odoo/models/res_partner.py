@@ -92,8 +92,6 @@ def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) 
     p = parse_algerian_rc(raw)
     if not p:
         return None
-    if p.get('year'):
-        return p['official']
     y = ''
     if fallback_year:
         s_yr = str(fallback_year).strip()
@@ -104,6 +102,8 @@ def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) 
             y = m.group(1)[-2:]
     if y:
         return f"{p['wilaya']}/00-{p['register_number']}{p['category']}{y}"
+    if p.get('year'):
+        return p['official']
     return p['official']
 
 def _normalize_algerian_date(val: Optional[any]) -> Optional[str]:

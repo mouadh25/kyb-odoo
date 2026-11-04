@@ -424,7 +424,7 @@ class ResConfigSettings(models.TransientModel):
                     if os.path.isdir(src_item):
                         if os.path.exists(dst_item):
                             shutil.rmtree(dst_item, ignore_errors=True)
-                        shutil.copytree(src_item, dst_item)
+                        shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
                     else:
                         if os.path.exists(dst_item):
                             try:
@@ -440,8 +440,24 @@ class ResConfigSettings(models.TransientModel):
             _logger.error("KYB in-app update extraction failed: %s", exc)
             raise UserError(_("Erreur lors de l'application de la mise à jour: %s") % str(exc))
 
+        try:
+            from odoo.modules import module as odoo_module
+            for attr_name in dir(odoo_module):
+                attr_obj = getattr(odoo_module, attr_name, None)
+                if hasattr(attr_obj, "cache_clear"):
+                    try:
+                        attr_obj.cache_clear()
+                    except Exception:
+                        pass
+            self.env["ir.module.module"].sudo().update_list()
+        except Exception:
+            pass
         mod = self.env["ir.module.module"].sudo().search([("name", "=", "kyb_odoo")], limit=1)
         if mod:
+            try:
+                mod.sudo().write({"latest_version": "2.0.0"})
+            except Exception:
+                pass
             _logger.info("Triggering button_immediate_upgrade for kyb_odoo...")
             return mod.button_immediate_upgrade()
 

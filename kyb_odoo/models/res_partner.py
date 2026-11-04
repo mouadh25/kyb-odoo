@@ -96,7 +96,10 @@ def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) 
         return p['official']
     y = ''
     if fallback_year:
-        m = re.search(r'(\d{4}|\d{2})', str(fallback_year))
+        s_yr = str(fallback_year).strip()
+        m4 = re.search(r'(\d{4})', s_yr)
+        m2 = re.match(r'^(\d{2})$', s_yr) if not m4 else None
+        m = m4 or m2 or re.search(r'(\d{2})', s_yr)
         if m:
             y = m.group(1)[-2:]
     if y:
@@ -242,16 +245,25 @@ def _get_config_param(env, key, default=""):
     """Universally get string config parameter across Odoo 16, 17, 18, 19, and 20."""
     try:
         icp = env["ir.config_parameter"].sudo()
+        if hasattr(icp, "search"):
+            try:
+                rec = icp.search([("key", "=", key)], limit=1)
+                if rec and getattr(rec, "value", None) is not None:
+                    return rec.value
+            except Exception:
+                pass
         if hasattr(icp, "get_str"):
             val = icp.get_str(key, default=None)
-            return val if val is not None else default
+            if val is not None:
+                return val
         if hasattr(icp, "get_param"):
-            return icp.get_param(key, default=default)
+            val = icp.get_param(key, default=default)
+            return val if val is not None else default
         if hasattr(icp, "_get"):
             val = icp._get(key)
-            return val if val is not None else default
-        rec = icp.search([("key", "=", key)], limit=1)
-        return rec.value if rec and rec.value is not None else default
+            if val is not None:
+                return val
+        return default
     except Exception:
         return default
 
@@ -510,6 +522,9 @@ def _get_kyb_client(env):
         or _get_config_param(env, "conforme.base_url", default="")
         or "https://kyb.digidevagency.dz"
     )
+    if "githubusercontent.com" in base_url or "github.com" in base_url:
+        base_url = "https://kyb.digidevagency.dz"
+        _set_config_param(env, "kyb.base_url", base_url)
 
     if not api_key:
         raise UserError(
@@ -644,24 +659,79 @@ class ResPartner(models.Model):
 
     # ──────────────── Action Buttons & Onchange Handlers ───────────
 
+    @api.model
+    def _get_view(self, view_id=None, view_type="form", **options):
+        """
+        Relax client-side 'required' constraint on partner 'name' when a fiscal/registry
+        identifier (kyb_nif, kyb_rc, vat, kyb_nis) is provided. Prevents Odoo OWL from
+        blocking 'Vérifier Fiche KYB' or form save with 'Champs obligatoires manquants'
+        when resolving a new partner solely by RC or NIF.
+        """
+        arch, view = super()._get_view(view_id=view_id, view_type=view_type, **options)
+        if view_type == "form" and arch is not None:
+            try:
+                for node in arch.xpath("//field[@name='name']"):
+                    req = node.get("required")
+                    if req and "type == 'contact'" in req and "kyb_nif" not in req:
+                        node.set(
+                            "required",
+                            f"({req}) and not kyb_nif and not kyb_rc and not vat and not kyb_nis",
+                        )
+            except Exception as e_view:
+                _logger.debug("KYB _get_view name required adjustment skipped: %s", e_view)
+        return arch, view
+
     @api.model_create_multi
     def create(self, vals_list):
-        for vals in vals_list:
+        raw_queries_by_idx = {}
+        for idx, vals in enumerate(vals_list):
             if isinstance(vals.get("country_id"), dict):
                 vals["country_id"] = vals["country_id"].get("id")
             if isinstance(vals.get("state_id"), dict):
                 vals["state_id"] = vals["state_id"].get("id")
+
+            # Detect if partner is being quick-created from a Supplier/Customer Invoice using a bare NIF or RC as 'name'
+            raw_name = (vals.get("name") or "").strip()
+            clean_name_id = re.sub(r"[\s\-_/.]", "", raw_name)
+            if clean_name_id and re.match(r"^\d{15}(\d{5})?$", clean_name_id):
+                if not vals.get("kyb_nif"):
+                    vals["kyb_nif"] = clean_name_id
+                if not vals.get("vat"):
+                    vals["vat"] = clean_name_id
+            elif raw_name and parse_algerian_rc(raw_name):
+                if not vals.get("kyb_rc"):
+                    vals["kyb_rc"] = raw_name
+
+            raw_rc_in = (vals.get("kyb_rc") or vals.get("company_registry") or "").strip()
+            raw_nif_in = (vals.get("kyb_nif") or vals.get("vat") or "").strip()
+            raw_nis_in = (vals.get("kyb_nis") or "").strip()
+
+            # Preserve the unformatted raw RC/NIF/NIS for post-create live resolution if record is not yet verified
+            is_already_verified = bool(
+                vals.get("kyb_last_verified")
+                or (vals.get("kyb_statut_cnrc") in ("ACTIF", "RADIE", "SUSPENDU") and raw_name and raw_name not in (raw_rc_in, raw_nif_in, raw_nis_in))
+            )
+            if not is_already_verified and (raw_nif_in or raw_rc_in or raw_nis_in):
+                raw_queries_by_idx[idx] = raw_nif_in or raw_rc_in or raw_nis_in
+
+            # Ensure 'name' is non-empty before DB insert when creating from NIF/RC only
+            if not vals.get("name") and (raw_nif_in or raw_rc_in or raw_nis_in):
+                vals["name"] = raw_nif_in or raw_rc_in or raw_nis_in
+
             if "kyb_rc" in vals or "company_registry" in vals:
                 rc_in = vals.get("kyb_rc") or vals.get("company_registry")
                 if rc_in:
-                    fmt_rc = format_official_rc(rc_in) or rc_in
+                    fmt_rc = format_official_rc(rc_in, vals.get("kyb_date_creation")) or rc_in
                     vals["kyb_rc"] = fmt_rc
                     if "company_registry" in self._fields:
                         vals["company_registry"] = fmt_rc
-            if (vals.get("kyb_nif") or vals.get("kyb_rc")) and vals.get("kyb_statut_cnrc") and not vals.get("kyb_last_verified"):
+            if (vals.get("kyb_nif") or vals.get("kyb_rc")) and vals.get("kyb_statut_cnrc") in ("ACTIF", "RADIE", "SUSPENDU") and not vals.get("kyb_last_verified"):
                 vals["kyb_last_verified"] = fields.Datetime.now()
-        # Determine if this batch has KYB-verified records before creation
-        has_kyb = any((v.get("kyb_nif") or v.get("kyb_rc")) and v.get("kyb_statut_cnrc") for v in vals_list)
+        # Determine if this batch has KYB-verified records or pending auto-resolve records before creation
+        has_kyb = any(
+            ((v.get("kyb_nif") or v.get("kyb_rc")) and v.get("kyb_statut_cnrc")) or (i in raw_queries_by_idx)
+            for i, v in enumerate(vals_list)
+        )
 
         if has_kyb:
             # mail_create_nolog=True: suppress Odoo's built-in "Contact créé" log message.
@@ -673,8 +743,14 @@ class ResPartner(models.Model):
         else:
             records = super().create(vals_list)
 
-        for record in records:
-            if (record.kyb_nif or record.kyb_rc) and record.kyb_statut_cnrc:
+        for idx, record in enumerate(records):
+            auto_q = raw_queries_by_idx.get(idx)
+            if auto_q and not (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
+                try:
+                    record.with_context(tracking_disable=True, mail_notrack=True)._do_kyb_resolve(auto_q)
+                except Exception as e_auto:
+                    _logger.warning("KYB auto-resolve on partner create failed for '%s': %s", auto_q, e_auto)
+            elif (record.kyb_nif or record.kyb_rc) and record.kyb_statut_cnrc:
                 record._post_kyb_audit_log()
         return records
 
@@ -943,11 +1019,31 @@ class ResPartner(models.Model):
     def action_verify_kyb(self):
         """Action button to trigger manual verification from partner form."""
         self.ensure_one()
+        # If record was just auto-verified during create() within the last 10 seconds, avoid redundant billing
+        if (
+            self.kyb_last_verified
+            and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU")
+            and self.name
+            and (fields.Datetime.now() - self.kyb_last_verified).total_seconds() < 10
+        ):
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": _("Vérification KYB Réussie"),
+                    "message": _("L'entité '%(name)s' a été vérifiée avec succès (Statut: %(statut)s).") % {
+                        "name": self.name,
+                        "statut": self.kyb_statut_cnrc,
+                    },
+                    "sticky": False,
+                    "type": "success",
+                },
+            }
         query = (
-            self.kyb_rc
-            or (self.company_registry if "company_registry" in self._fields else False)
-            or self.kyb_nif
+            self.kyb_nif
             or self.conforme_nif
+            or self.kyb_rc
+            or (self.company_registry if "company_registry" in self._fields else False)
             or self.vat
             or self.kyb_nis
             or self.name
@@ -985,6 +1081,30 @@ class ResPartner(models.Model):
     def action_verify_conforme(self):
         """Backward compatible action method alias."""
         return self.action_verify_kyb()
+
+    @api.onchange("name")
+    def _onchange_name_kyb_identifier(self):
+        """
+        When a user enters an exact 15/20-digit NIF or an Algerian RC number directly into
+        the 'Nom' field (e.g. via 'Créer et modifier...' from a Supplier Invoice),
+        automatically resolve and enrich the partner from the KYB registry.
+        """
+        if not self.name or (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
+            return
+        raw_name = self.name.strip()
+        clean_num = re.sub(r"[\s\-_/.]", "", raw_name)
+        if re.match(r"^\d{15}(\d{5})?$", clean_num):
+            if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and self.kyb_nif == clean_num:
+                return
+            self.kyb_nif = clean_num
+            if not self.vat:
+                self.vat = clean_num
+            return self._do_kyb_resolve(clean_num)
+        if parse_algerian_rc(raw_name):
+            if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and self.kyb_rc:
+                return
+            self.kyb_rc = raw_name
+            return self._do_kyb_resolve(raw_name)
 
     @api.onchange("vat")
     def _onchange_vat(self):
@@ -1033,19 +1153,26 @@ class ResPartner(models.Model):
         if not raw_rc or len(raw_rc) < 4:
             return
 
-        fmt_rc = format_official_rc(raw_rc)
-        if fmt_rc:
-            self.kyb_rc = fmt_rc
-            if "company_registry" in self._fields:
-                self.company_registry = fmt_rc
-
-        target_rc = fmt_rc or raw_rc
+        fmt_rc = format_official_rc(raw_rc, self.kyb_date_creation)
         # Grille Tarifaire Guard: Skip API call if already verified with matching RC (0 credits)
-        if self.kyb_last_verified and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU") and (self.kyb_rc == target_rc or self.conforme_rc == target_rc):
+        if (
+            self.kyb_last_verified
+            and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU")
+            and self.name
+            and self.name.strip() not in (raw_rc, fmt_rc or "")
+            and (self.kyb_rc in (raw_rc, fmt_rc) or self.conforme_rc in (raw_rc, fmt_rc))
+        ):
             return
         if (getattr(self.env, "context", None) or {}).get("kyb_skip_resolve"):
             return
-        return self._do_kyb_resolve(target_rc)
+        res = self._do_kyb_resolve(raw_rc)
+        if not self.kyb_rc or self.kyb_rc == raw_rc:
+            final_fmt = format_official_rc(self.kyb_rc or raw_rc, self.kyb_date_creation)
+            if final_fmt:
+                self.kyb_rc = final_fmt
+                if "company_registry" in self._fields:
+                    self.company_registry = final_fmt
+        return res
 
     @api.onchange("kyb_nis")
     def _onchange_kyb_nis(self):

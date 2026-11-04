@@ -1,5 +1,5 @@
 # KYB pour Odoo — Manuel Utilisateur
-**Version :** `2.0.4` / `20.0.2.0.4`  
+**Version :** `2.0.8` / `20.0.2.0.8`  
 **Cible :** Directeurs Financiers (DAF), Responsables Comptables, Gestionnaires Achats & Ventes  
 **Portail KYB (by Digidev) :** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
 **Compatibilité :** Odoo 16.0 LTS, 17.0, 18.0, 19.0, 20.0 (Community & Enterprise)
@@ -8,13 +8,14 @@
 
 ## 1. À propos du module KYB
 
-Le module **KYB pour Odoo** facilite l'identification de vos tiers et la conformité fiscale de vos pièces comptables en Algérie :
+Le module **KYB pour Odoo** facilite l'identification de vos tiers et la conformité fiscale et commerciale de vos pièces comptables en Algérie :
 
-- **Recherche & Auto-complétion Prédictive Instantanée :** Pour les Personnes Morales (sociétés), recherchez par raison sociale (`CEVITAL`) et obtenez instantanément le statut légal (`🟢 Actif` / `🔴 Radié`), la forme juridique, le RC et la wilaya. Pour toutes les entités, recherche directe par **NIF**, **RC** ou **NIS**.
-- **Enrichissement Fiscal & Légal Certifié en 1 Clic :** Renseignement automatique de la raison sociale, forme juridique, NIF (15 chiffres), RC normalisé (Décret 05-468), NIS, capital social, dirigeants, adresse du siège et nomenclature NAE.
-- **Vérification de Statut Juridique en Temps Réel :** Consultation de l'état officiel (**Actif**, **Radié**, **Suspendu**) avec note d'audit horodatée.
-- **Contrôle Temporel des Factures Fournisseurs :** Détection automatique des fournisseurs radiés à la date d'émission de la facture (Articles 169 & 176 CIDTA / Art. 30 CTCA). Alerte ou blocage configurable.
-- **Prévention des Doublons Fiscaux :** Alerte immédiate si un NIF existe déjà dans la base, préservant la cohérence de votre grand livre.
+- **Recherche & Auto-complétion Prédictive Instantanée :** Pour les Personnes Morales (sociétés), recherchez par raison sociale (`CEVITAL`) et obtenez instantanément le statut légal (`Actif` / `Radié`), la forme juridique, le RC et la wilaya. Pour toutes les entités, recherche directe par **NIF**, **RC** ou **NIS**.
+- **Enrichissement Fiscal & Légal Certifié en 1 Clic :** Renseignement automatique de la raison sociale, forme juridique, NIF (15 ou 20 chiffres), RC normalisé (Décret 05-468), NIS, capital social, dirigeants, adresse du siège et nomenclature NAE.
+- **Vérification de Statut Juridique en Temps Réel :** Consultation de l'état officiel (**Actif**, **Radié**, **Suspendu**) avec carte d'audit institutionnelle unique horodatée dans le Chatter.
+- **Contrôle Temporel des Factures Fournisseurs (Achats) :** Détection automatique des fournisseurs radiés à la date d'émission de la facture (Articles 169 & 176 CIDTA / Art. 30 CTCA). Blocage strict ou avertissement configurable.
+- **Risque Commercial & Traçabilité État 104 des Factures Clients (Ventes) :** Évaluation automatique dès la génération de la facture (y compris depuis un Bon de Commande `sale.order`), alerte de risque d'insolvabilité et note **État 104 (Art. 183 ter CIDTA)** non-bloquante au Chatter (ou blocage / mode silencieux selon votre politique).
+- **Prévention des Doublons Fiscaux :** Alerte immédiate si un NIF existe déjà dans la base, préservant la cohérence de votre grand livre auxiliaire.
 - **Hébergement en Algérie (Loi 25-11) :** Infrastructure 100% algérienne opérée au Datacenter d'Algérie Télécom. Zéro données personnelles transmises à l'étranger.
 
 ---
@@ -37,7 +38,9 @@ La mise en service s'effectue en moins de deux minutes.
    - **API Key :** Votre clé secrète (affichée masquée `•••••••••`).
    - **Gateway URL :** `https://kyb.digidevagency.dz` (pré-rempli).
    - **Filtre Statut Tiers :** `Toutes les entités` (recommandé) ou `Actives uniquement`.
-   - **Politique de Validation des Factures :** `Blocage Strict` (défaut) ou `Avertissement`.
+   - **Action sur Fournisseur Radié (Achats) :** `Blocage Strict` (défaut) ou `Avertissement`.
+   - **Action sur Client Radié (Ventes / État 104) :** `Avertissement & Traçabilité État 104` (défaut recommandé), `Blocage Strict`, ou `Badge Uniquement`.
+   - **Action sur Fournisseur Non Vérifié :** `Autoriser avec avertissement` (défaut) ou `Exiger la vérification préalable`.
    - **Détection des Doublons NIF :** `Avertissement` (défaut), `Blocage Strict`, ou `Ignorer`.
 3. Cliquez sur **Enregistrer**.
 
@@ -119,31 +122,45 @@ Le **NIF** est un identifiant national unique. Les doublons entraînent des écl
 
 ---
 
-## 6. Contrôle Temporel des Factures Fournisseurs
+## 6. Contrôle Temporel des Factures Fournisseurs (Achats) & Clients (Ventes / État 104)
 
-En droit algérien (Art. 169 & 176 CIDTA / Art. 30 CTCA), les achats auprès d'un fournisseur **radié à la date d'émission** ne sont pas déductibles en IBS ni en TVA.
+Le module distingue intelligemment vos **Factures d'Achat (Fournisseurs)** et vos **Factures de Vente (Clients)** selon les règles fiscales algériennes applicables à chaque flux :
 
 > [!IMPORTANT]
-> L'éligibilité fiscale s'apprécie **à la date exacte d'émission de la facture**, non à la date du paiement. KYB contrôle automatiquement cette concordance.
+> L'éligibilité fiscale et le statut du tiers s'apprécient **à la date exacte d'émission de la facture**, non à la date du paiement. KYB évalue automatiquement cette concordance dès la création de la facture (y compris lorsqu'elle est générée depuis un Bon de Commande `sale.order` ou une Commande d'Achat `purchase.order`).
 
-### Paliers de contrôle
+### 6.1 Factures Fournisseurs (Achats — Art. 169 & 176 CIDTA / Art. 30 CTCA)
+En droit algérien, les achats auprès d'un fournisseur **radié à la date d'émission** ne sont pas déductibles en IBS ni en TVA.
 
 | Palier | Déclencheur | Action |
 | :---: | :--- | :--- |
-| **1 — Prévention** | À la saisie du fournisseur & de la date | Bannière rouge `🔴 Non Conforme` en tête de facture avant la saisie des montants. |
-| **2 — Validation** | Au clic sur **Confirmer** | *Mode Strict :* blocage avec motif. *Mode Avertissement :* validation avec note d'audit. |
+| **1 — Prévention** | À la saisie ou génération de la facture | Badge `🔴 Non Conforme (Tiers Radié)` et bannière rouge en tête de facture avant la comptabilisation. |
+| **2 — Validation** | Au clic sur **Confirmer** | *Blocage Strict (défaut) :* comptabilisation bloquée avec motif légal. *Avertissement :* validation avec note rouge dans le Chatter. |
 | **3 — Clôture mensuelle** | Automatique le 18 du mois | Rapport consolidé des fournisseurs radiés sur la période, avant échéance G50. |
 
 ![Bannière d'alerte sur fournisseur radié](screenshots/06_temporal_invoice_audit_bill.png)
-*Figure 6 : Alerte temporelle sur une facture émise après la date de radiation du fournisseur.*
+*Figure 6 : Alerte temporelle sur une facture émise après la date de radiation du tiers.*
 
-### Vue liste des factures
-Dans **Facturation → Fournisseurs → Factures**, la colonne **Conformité Fiscale KYB** affiche :
-- `🟢 Conforme` — fournisseur actif, charge et TVA déductibles.
-- `🔴 Non Conforme` — risque de rejet fiscal, examen recommandé.
+### 6.2 Factures Clients (Ventes — Art. 183 ter CIDTA État 104 & Risque Commercial)
+Contrairement aux achats, l'émission d'une facture de vente à un client radié ne génère pas de rejet de charge déductible (la TVA collectée reste due au Trésor). Toutefois, facturer un client radié présente :
+1. **Un risque commercial d'impayé** (client ayant cessé son activité légale — règlement au comptant recommandé).
+2. **Une vigilance sur l'État 104 (Art. 183 ter CIDTA)** lors du recoupement annuel des ventes B2B.
+
+Vous pouvez configurer le comportement souhaité dans **Paramètres → KYB Compliance → Action sur Client Radié (Ventes / État 104)** :
+
+| Mode configuré | Comportement sur Factures Clients (`out_invoice` / `out_refund`) |
+| :--- | :--- |
+| **Avertissement & Traçabilité État 104** *(Défaut recommandé)* | Évalue automatiquement la facture dès sa création (même depuis un Bon de Commande), affiche une notification non-bloquante et consigne un encadré **`Signalement Risque Commercial & État 104 (Client Radié — Non-Bloquant)`** dans le Chatter lors de la confirmation, **sans bloquer la comptabilisation**. |
+| **Blocage Strict** | Interdit la confirmation (`Confirmer`) d'une facture de vente pour un client radié (`⛔ FACTURATION CLIENT INTERROMPUE`). |
+| **Badge Uniquement** | Met à jour le badge `Non Conforme (Tiers Radié)` et l'onglet KYB de manière silencieuse, sans fenêtre pop-up ni note dans le Chatter. |
+
+### 6.3 Vue liste des factures
+Dans **Facturation → Fournisseurs → Factures** et **Facturation → Clients → Factures**, la colonne **Conformité Fiscale KYB** affiche :
+- `🟢 Conforme (Actif)` — tiers actif au registre du commerce à la date de la pièce.
+- `🔴 Non Conforme (Tiers Radié)` — tiers radié antérieurement à la date de la facture.
 
 ![Liste des factures avec statuts de conformité](screenshots/07_vendor_bills_compliance_tree.png)
-*Figure 7 : Vue synthétique des factures fournisseurs avec indicateurs de conformité fiscale.*
+*Figure 7 : Vue synthétique des factures avec indicateurs de conformité KYB.*
 
 ---
 
@@ -164,13 +181,16 @@ Pour sécuriser votre déclaration mensuelle :
 Si une entreprise est de création très récente, s'il s'agit d'une dénomination commerciale abrégée ou en cas de variante orthographique, saisissez directement son **NIF à 15 chiffres** ou son **Numéro RC** dans les champs correspondants du formulaire. Le connecteur interrogera directement le registre central sur ces identifiants officiels uniques.
 
 **Comment identifier un commerçant individuel ou un artisan (Personne Physique) ?**  
-Conformément à la Loi 18-07 sur la protection des données personnelles, la recherche nominative prédictive est réservée aux Personnes Morales. Pour un commerçant individuel ou un artisan, cochez **Individu** et effectuez l'identification par son **NIF individuel à 15 chiffres** (commençant par `1`) ou son **Numéro RC Catégorie A ou C** (ex : `16/00-0123456A20`).
+Conformément à la Loi 18-07 sur la protection des données personnelles, la recherche nominative prédictive est réservée aux Personnes Morales. Pour un commerçant individuel ou un artisan, cochez **Individu** et effectuez l'identification par son **NIF individuel à 15 ou 20 chiffres** ou son **Numéro RC Catégorie A ou C** (ex : `16/00-0123456A20`).
 
 **Pourquoi le numéro d'Article d'Imposition (Rôle) n'est-il pas rempli automatiquement ?**  
 En vertu de l'**Article 114 du Code des Procédures Fiscales (CPF)**, le Numéro d'Article d'Imposition relève du secret fiscal et n'est pas un identifiant public. Il figure obligatoirement sur les factures imprimées de vos fournisseurs (Décret 05-468). Il vous suffit de le renseigner une seule fois lors du premier traitement de facture : KYB le conserve et l'associe définitivement à la fiche tiers pour vos futures déclarations.
 
-**Que faire si une facture affiche l'alerte « 🔴 Non Conforme (Fournisseur Radié) » ?**  
-Cette alerte indique que le fournisseur était officiellement radié des registres (CNRC) à la date d'émission de la facture. En droit fiscal algérien (Articles 169 & 176 CIDTA et Art. 30 CTCA), les charges et la TVA d'un fournisseur radié ne sont pas déductibles. Rapprochez-vous de votre fournisseur pour obtenir une attestation de régularité fiscale récente ou faites valider la pièce par votre direction financière (DAF) selon la politique interne de votre entreprise.
+**Que faire si une facture d'achat affiche l'alerte « 🔴 Non Conforme (Tiers Radié) » ?**  
+Sur une facture fournisseur, cette alerte indique que le fournisseur était officiellement radié des registres (CNRC) à la date d'émission de la facture. En droit fiscal algérien (Articles 169 & 176 CIDTA et Art. 30 CTCA), les charges et la TVA d'un fournisseur radié ne sont pas déductibles. Rapprochez-vous de votre fournisseur pour obtenir une attestation de régularité fiscale récente ou faites valider la pièce par votre direction financière (DAF).
+
+**Pourquoi une facture de vente (Client) pour un client radié n'est-elle pas bloquée par défaut ?**  
+Sur une facture client (`out_invoice`), la TVA collectée reste exigible par le Trésor Public. Par défaut (*Avertissement & Traçabilité État 104*), KYB autorise donc la confirmation comptable tout en consignant une alerte **`Signalement Risque Commercial & État 104 (Client Radié — Non-Bloquant)`** dans le Chatter afin d'alerter vos équipes commerciales (risque d'insolvabilité) et comptables (état récapitulatif annuel des clients — Art. 183 ter CIDTA). Si votre politique interne interdit de facturer un client radié, vous pouvez activer le mode **Blocage Strict** dans **Paramètres → KYB Compliance → Action sur Client Radié**.
 
 **Comment traiter un doublon fiscal détecté lors de la création d'un contact ?**  
 Lorsque la boîte de dialogue signale qu'un NIF existe déjà, vous pouvez annuler la saisie pour utiliser la fiche déjà présente. Si deux fiches ont été créées par inadvertance, sélectionnez-les dans la liste des contacts puis cliquez sur **Action → Fusionner** : l'historique comptable et l'ensemble des données KYB sont intégralement conservés sur la fiche consolidée.

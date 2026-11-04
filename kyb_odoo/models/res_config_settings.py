@@ -15,13 +15,25 @@ def _get_config_param(env, key, default=""):
     """Universally get string config parameter across Odoo 16, 17, 18, 19, and 20."""
     try:
         icp = env["ir.config_parameter"].sudo()
+        if hasattr(icp, "search"):
+            try:
+                rec = icp.search([("key", "=", key)], limit=1)
+                if rec and getattr(rec, "value", None) is not None:
+                    return rec.value
+            except Exception:
+                pass
         if hasattr(icp, "get_str"):
             val = icp.get_str(key, default=None)
-            return val if val is not None else default
+            if val is not None:
+                return val
         if hasattr(icp, "get_param"):
-            return icp.get_param(key, default=default)
-        rec = icp.search([("key", "=", key)], limit=1)
-        return rec.value if rec and rec.value is not None else default
+            val = icp.get_param(key, default=default)
+            return val if val is not None else default
+        if hasattr(icp, "_get"):
+            val = icp._get(key)
+            if val is not None:
+                return val
+        return default
     except Exception:
         return default
 
@@ -109,10 +121,21 @@ class ResConfigSettings(models.TransientModel):
             ("soft_warn", "Avertissement (Consignation dans le Chatter sans blocage)"),
             ("warning", "Avertissement (Consignation dans le Chatter sans blocage)"),
         ],
-        string="Politique de Validation des Factures",
+        string="Politique de Validation des Factures Fournisseurs (Achats)",
         config_parameter="kyb.invoice_blocking_policy",
         default="strict_block",
-        help="Comportement lors de la confirmation d'une facture d'achat pour un fournisseur radié.",
+        help="Comportement lors de la confirmation d'une facture d'achat pour un fournisseur radié (Art. 169 & 176 CIDTA / Art. 30 CTCA).",
+    )
+    kyb_customer_invoice_policy = fields.Selection(
+        selection=[
+            ("soft_warn", "Avertissement & Traçabilité État 104 (Autoriser la facturation avec alerte — Recommandé)"),
+            ("strict_block", "Blocage Strict (Interdire la facturation d'un client radié)"),
+            ("badge_only", "Badge Uniquement (Silencieux — Sans fenêtre d'alerte ni note Chatter sur ventes)"),
+        ],
+        string="Politique Factures Clients (Ventes / État 104)",
+        config_parameter="kyb.customer_invoice_policy",
+        default="soft_warn",
+        help="Comportement lors de la création ou confirmation d'une facture de vente (out_invoice / out_refund) pour un client radié (Risque commercial & État 104 Art. 183 ter CIDTA).",
     )
     kyb_unverified_partner_policy = fields.Selection(
         selection=[
@@ -253,14 +276,28 @@ class ResConfigSettings(models.TransientModel):
         audited_invoices = 0
         compliant_invoices = 0
         blocked_invoices = 0
-        if "kyb_audit_status" in self.env["account.move"]._fields:
-            audited_invoices = self.env["account.move"].sudo().search_count([("kyb_audit_status", "!=", False)])
-            compliant_invoices = self.env["account.move"].sudo().search_count([("kyb_audit_status", "=", "compliant")])
-            blocked_invoices = self.env["account.move"].sudo().search_count([("kyb_audit_status", "in", ["non_compliant", "blocked"])])
+        move_fields = self.env["account.move"]._fields
+        status_field = (
+            "kyb_compliance_status"
+            if "kyb_compliance_status" in move_fields
+            else ("kyb_audit_status" if "kyb_audit_status" in move_fields else None)
+        )
+        if status_field:
+            audited_invoices = self.env["account.move"].sudo().search_count([
+                (status_field, "in", ["compliant", "warning", "non_compliant", "blocked"]),
+            ])
+            compliant_invoices = self.env["account.move"].sudo().search_count([
+                (status_field, "=", "compliant"),
+            ])
+            blocked_invoices = self.env["account.move"].sudo().search_count([
+                (status_field, "in", ["non_compliant", "blocked"]),
+            ])
 
         # Configuration security posture
         config_posture = {
             "invoice_blocking_policy": _get_config_param(self.env, "kyb.invoice_blocking_policy", "strict_block"),
+            "customer_invoice_policy": _get_config_param(self.env, "kyb.customer_invoice_policy", "soft_warn"),
+            "unverified_partner_policy": _get_config_param(self.env, "kyb.unverified_partner_policy", "allow_warn"),
             "duplicate_nif_policy": _get_config_param(self.env, "kyb.duplicate_nif_policy", "warn"),
             "sovereign_autocomplete": str(_get_config_param(self.env, "kyb.sovereign_autocomplete", "True")).lower() == "true",
             "auto_update_patches": str(_get_config_param(self.env, "kyb.auto_update_patches", "False")).lower() == "true",
@@ -296,7 +333,7 @@ class ResConfigSettings(models.TransientModel):
         }
 
     def action_check_kyb_update(self):
-        """Manually triggers version check and telemetry heartbeat to Conforme Gateway."""
+        """Manually triggers version check and telemetry heartbeat to KYB Gateway."""
         import requests
         base_url = (self.kyb_base_url or "https://kyb.digidevagency.dz").rstrip("/")
         api_key = self.kyb_api_key or ""
@@ -436,30 +473,31 @@ class ResConfigSettings(models.TransientModel):
                 shutil.rmtree(temp_extract_dir, ignore_errors=True)
                 _logger.info("KYB module files updated cleanly in %s", module_path)
 
+                # Ensure manifest on disk has series prefix if running in Odoo 16+
+                try:
+                    import re
+                    from odoo import release
+                    series = getattr(release, "serie", None) or getattr(release, "major_version", "")
+                    manifest_file = os.path.join(module_path, "__manifest__.py")
+                    if series and os.path.exists(manifest_file):
+                        with open(manifest_file, "r", encoding="utf-8") as mf:
+                            mf_text = mf.read()
+                        mf_updated = re.sub(r'"version":\s*"(\d+\.\d+\.\d+)"', f'"version": "{series}.\\1"', mf_text)
+                        with open(manifest_file, "w", encoding="utf-8") as mf:
+                            mf.write(mf_updated)
+                except Exception as exc_mf:
+                    _logger.warning("KYB manifest series alignment note: %s", exc_mf)
+
         except Exception as exc:
             _logger.error("KYB in-app update extraction failed: %s", exc)
             raise UserError(_("Erreur lors de l'application de la mise à jour: %s") % str(exc))
 
-        try:
-            from odoo.modules import module as odoo_module
-            for attr_name in dir(odoo_module):
-                attr_obj = getattr(odoo_module, attr_name, None)
-                if hasattr(attr_obj, "cache_clear"):
-                    try:
-                        attr_obj.cache_clear()
-                    except Exception:
-                        pass
-            self.env["ir.module.module"].sudo().update_list()
-        except Exception:
-            pass
         mod = self.env["ir.module.module"].sudo().search([("name", "=", "kyb_odoo")], limit=1)
         if mod:
-            try:
-                mod.sudo().write({"latest_version": "2.0.0"})
-            except Exception:
-                pass
             _logger.info("Triggering button_immediate_upgrade for kyb_odoo...")
             return mod.button_immediate_upgrade()
+
+        return {"type": "ir.actions.client", "tag": "reload"}
 
         return {"type": "ir.actions.client", "tag": "reload"}
 

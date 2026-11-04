@@ -148,13 +148,13 @@
 
     <div style="background: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 20px 22px;">
       <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 4px;">
-        S&eacute;curit&eacute; Fiscale
+        S&eacute;curit&eacute; Fiscale &amp; Commerciale
       </div>
       <div style="font-size: 15px; font-weight: 600; color: #09090b; margin-bottom: 6px;">
-        Blocage Factures Radi&eacute;es
+        Audit Factures Achats &amp; Ventes
       </div>
       <div style="font-size: 13px; color: #52525b; line-height: 1.55; font-weight: 300;">
-        Audit &agrave; date de pi&egrave;ce (CIDTA 169 &amp; 176) pour emp&ecirc;cher la d&eacute;duction de TVA et de charge sur fournisseurs radi&eacute;s.
+        Blocage des achats sur fournisseurs radi&eacute;s (CIDTA 169 &amp; 176) et alerte risque commercial &amp; &Eacute;tat 104 non-bloquante sur ventes (CIDTA 183 ter).
       </div>
     </div>
 
@@ -316,10 +316,10 @@
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
       <div>
         <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #be123c; margin-bottom: 3px;">
-          Fonctionnalit&eacute; 04 &bull; Conformit&eacute; Fiscale CIDTA 169 &amp; 176
+          Fonctionnalit&eacute; 04 &bull; Conformit&eacute; Fiscale CIDTA 169, 176 &amp; 183 ter
         </div>
         <h2 style="font-size: 21px; font-weight: 400; color: #09090b; margin: 0; letter-spacing: -0.02em;">
-          Contr&ocirc;le &amp; Blocage des Factures Fournisseurs Radi&eacute;s
+          Contr&ocirc;le des Factures Fournisseurs (Achats) &amp; Clients (Ventes / &Eacute;tat 104)
         </h2>
       </div>
       <span style="display: inline-block; padding: 3px 9px; border-radius: 4px; font-size: 11px; font-weight: 500; background: #fff1f2; color: #be123c; border: 1px solid #fecdd3;">
@@ -328,11 +328,12 @@
     </div>
 
     <div style="background: #fff1f2; border: 1px solid #fecdd3; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #881337; line-height: 1.55;">
-      <strong>Protection des D&eacute;ductions Fiscales :</strong> Toute facture &eacute;mise par un fournisseur radi&eacute; du registre de commerce expose l&rsquo;entreprise &agrave; un rejet de d&eacute;ductibilit&eacute; de TVA (Art. 30 TCA) et de charge (Art. 169 &amp; 176 CIDTA).
+      <strong>Achats (Fournisseurs &mdash; Art. 169 &amp; 176 CIDTA / Art. 30 CTCA) :</strong> Toute facture d&rsquo;achat &eacute;mise par un fournisseur radi&eacute; expose l&rsquo;entreprise &agrave; un rejet de d&eacute;ductibilit&eacute; de TVA et de charge (blocage strict par d&eacute;faut).<br />
+      <strong>Ventes (Clients &mdash; Art. 183 ter CIDTA &Eacute;tat 104) :</strong> Pour les factures de vente (cr&eacute;&eacute;es directement ou g&eacute;n&eacute;r&eacute;es depuis un Bon de Commande), KYB signale le risque commercial et consigne une alerte <strong>&Eacute;tat 104 non-bloquante</strong> au Chatter tout en autorisant la comptabilisation de la TVA collect&eacute;e.
     </div>
 
     <p style="font-size: 14px; color: #52525b; margin: 0 0 18px 0; line-height: 1.6; font-weight: 300;">
-      KYB v&eacute;rifie la situation l&eacute;gale du fournisseur <strong>&agrave; la date exacte d&rsquo;&eacute;mission de la facture</strong>. Si le fournisseur &eacute;tait radi&eacute; &agrave; cette date, Odoo affiche une banni&egrave;re d&rsquo;alerte explicite et applique votre politique (avertissement ou blocage strict de la confirmation comptable).
+      KYB v&eacute;rifie la situation l&eacute;gale du tiers <strong>&agrave; la date exacte d&rsquo;&eacute;mission de la facture</strong> et distingue intelligemment le flux Achats (blocage strict ou avertissement) du flux Ventes (avertissement non-bloquant &amp; tra&ccedil;abilit&eacute; &Eacute;tat 104, blocage strict ou badge silencieux).
     </p>
 
     <!-- Bill Warning Screenshot -->
@@ -340,7 +341,7 @@
       <img src="screenshot_temporal_audit.png" alt="Alerte Facture Fournisseur Radi&eacute; Odoo" style="width: 100%; height: auto; display: block;" />
     </div>
     <div style="font-size: 12px; color: #71717a; text-align: center; margin-bottom: 22px; font-weight: 300;">
-      Figure 5 : Banni&egrave;re d&rsquo;alerte sur une facture &eacute;mise par un fournisseur radi&eacute; &agrave; la date de la pi&egrave;ce.
+      Figure 5 : Banni&egrave;re d&rsquo;alerte sur une facture &eacute;mise pour un tiers radi&eacute; &agrave; la date de la pi&egrave;ce.
     </div>
 
     <!-- Vendor Bills List View -->
@@ -348,7 +349,7 @@
       <img src="screenshot_vendor_bills.png" alt="Vue Liste Factures Achats KYB" style="width: 100%; height: auto; display: block;" />
     </div>
     <div style="font-size: 12px; color: #71717a; text-align: center; margin-top: 10px; font-weight: 300;">
-      Figure 6 : Statut de conformit&eacute; dans la vue liste des factures d&rsquo;achat pour d&eacute;tecter les anomalies avant la d&eacute;claration G50.
+      Figure 6 : Statut de conformit&eacute; dans la vue liste des factures pour d&eacute;tecter les anomalies avant la d&eacute;claration G50 et l&rsquo;&Eacute;tat 104.
     </div>
 
   </div>
@@ -372,14 +373,14 @@
     </div>
 
     <p style="font-size: 14px; color: #52525b; margin: 0 0 18px 0; line-height: 1.6; font-weight: 300;">
-      L&rsquo;activation s&rsquo;effectue directement dans <em>Facturation &rarr; Configuration &rarr; Param&egrave;tres &rarr; V&eacute;rification Fiscale KYB</em>. Renseignez votre cl&eacute; d&rsquo;API KYB et d&eacute;finissez la politique d&rsquo;audit (Avertissement ou Blocage strict).
+      L&rsquo;activation s&rsquo;effectue directement dans <em>Param&egrave;tres &rarr; KYB Compliance</em>. Renseignez votre cl&eacute; d&rsquo;API KYB et configurez distinctement la politique sur <strong>Fournisseur Radi&eacute; (Achats)</strong> et sur <strong>Client Radi&eacute; (Ventes / &Eacute;tat 104)</strong>.
     </p>
 
     <div style="border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04);">
       <img src="screenshot_settings.png" alt="Panneau de Configuration KYB Odoo" style="width: 100%; height: auto; display: block;" />
     </div>
     <div style="font-size: 12px; color: #71717a; text-align: center; margin-top: 10px; font-weight: 300;">
-      Figure 7 : Cl&eacute; d&rsquo;API masqu&eacute;e, politique de blocage des factures et programmation du contr&ocirc;le p&eacute;riodique G50.
+      Figure 7 : Cl&eacute; d&rsquo;API masqu&eacute;e, politiques de validation Achats / Ventes (&Eacute;tat 104) et contr&ocirc;le p&eacute;riodique G50.
     </div>
 
   </div>
@@ -486,10 +487,10 @@
   <!-- ──────────────── 11. SUBTLE METADATA FOOTNOTE ──────────────── -->
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 4px 6px 12px 6px; font-size: 11.5px; color: #71717a; font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums;">
     <div>
-      Connecteur Officiel KYB &bull; Conforme D&eacute;cret 05-468 &amp; CIDTA Art. 169/176
+      Connecteur Officiel KYB &bull; Conforme D&eacute;cret 05-468 &amp; CIDTA Art. 169, 176 &amp; 183 ter
     </div>
     <div>
-      Version <strong>1.4.5</strong> &bull; Licence LGPL-3 &bull; Odoo 16, 17, 18, 19 &amp; 20
+      Version <strong>2.0.8</strong> &bull; Licence LGPL-3 &bull; Odoo 16, 17, 18, 19 &amp; 20
     </div>
   </div>
 

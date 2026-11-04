@@ -53,17 +53,23 @@
                             <field name="kyb_duplicate_nif_policy" class="w-100"/>
                         </setting>
 
-                        <setting string="Temporal Invoice Compliance &amp; Blocking Policy" help="Enforce CIDTA Art. 169 &amp; 176 and CTCA Art. 30 rules on vendor bills.">
+                        <setting string="Temporal Invoice Compliance &amp; Blocking Policy" help="Contrôle réglementaire des factures d'achat (Art. 169 &amp; 176 CIDTA / Art. 30 CTCA) et traçabilité commerciale des factures de vente (Art. 183 ter CIDTA — État 104).">
                             <field name="kyb_invoice_audit_enabled"/>
                             <div class="content-group mt-2">
                                 <div class="row mt-2">
-                                    <label for="kyb_invoice_blocking_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action on Deregistered Supplier"/>
+                                    <label for="kyb_invoice_blocking_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action sur Fournisseur Radié (Achats)"/>
                                     <div class="col-12 col-lg-9">
                                         <field name="kyb_invoice_blocking_policy" class="w-100"/>
                                     </div>
                                 </div>
                                 <div class="row mt-2">
-                                    <label for="kyb_unverified_partner_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action on Unverified Supplier"/>
+                                    <label for="kyb_customer_invoice_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action sur Client Radié (Ventes / État 104)"/>
+                                    <div class="col-12 col-lg-9">
+                                        <field name="kyb_customer_invoice_policy" class="w-100"/>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <label for="kyb_unverified_partner_policy" class="col-12 col-lg-3 o_light_label font-weight-bold" string="Action sur Fournisseur Non Vérifié"/>
                                     <div class="col-12 col-lg-9">
                                         <field name="kyb_unverified_partner_policy" class="w-100"/>
                                     </div>
@@ -135,7 +141,8 @@
                                     <strong class="d-block mb-1">Cadre Réglementaire, Secret Fiscal &amp; Sécurité des Données</strong>
                                     <p class="mb-0 text-muted small">
                                         • <strong>Loi 18-07 / 25-11 :</strong> Hébergement 100% en Algérie sur le Datacenter Algérie Télécom (aucune transmission de données hors du territoire national).<br/>
-                                        • <strong>Articles 169 &amp; 176 du CIDTA &amp; Art. 30 du CTCA :</strong> Contrôle réglementaire de l'état d'activité des fournisseurs au registre du commerce avant comptabilisation des factures d'achat.<br/>
+                                        • <strong>Articles 169 &amp; 176 du CIDTA &amp; Art. 30 du CTCA (Achats) :</strong> Contrôle réglementaire de l'état d'activité des fournisseurs au registre du commerce avant comptabilisation des factures d'achat.<br/>
+                                        • <strong>Article 183 ter du CIDTA (Ventes &amp; État 104) :</strong> Signalement non-bloquant du risque commercial et traçabilité pour l'état récapitulatif annuel des clients (État 104) lorsqu'un client est enregistré comme radié.<br/>
                                         • <strong>Article 114 du CPF (Secret Fiscal) :</strong> L'Article d'Imposition (Numéro de Rôle) relève du secret fiscal et n'est pas divulgué dans les registres publics CNRC. Il doit être renseigné manuellement sur la fiche contact à réception de la première facture commerciale (Décret 05-468).
                                     </p>
                                 </div>

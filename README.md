@@ -23,7 +23,9 @@ Developed and maintained by **Mouadh Benhassine** ([@mouadh25](https://github.co
   * Comprehensive Registry Activities (*Toutes les ActivitÃ©s RC*)
   * Legal Representative (*GÃ©rant / ReprÃ©sentant LÃ©gal*)
 * **DÃ©cret 05-468 RC Formatting & Validation Engine:** Fully implements the Algerian statutory trade registry standard (`WW/00-XXXXXXX[A|B|C|D]YY`). Validates all 69 Wilayas (Loi 26-06), auto-pads 7-digit registry numbers, parses compressed/spaced/Arabic variants, and establishes bidirectional synchronization with Odoo's native `company_registry` field.
-* **Objective Temporal Status Audit (CIDTA Art. 176 & CTCA Art. 30):** Protects corporate accounting teams against tax audit reassessments (*rejets fiscaux sur Ã‰tat 104*). A vendor strike-off (*Radiation*) only disallows transactions issued *after* the effective date. The connector audits status objectively against the exact invoice date with sanitized, neutral institutional notices (zero legal liability assertions).
+* **Objective Temporal Status Audit â€” Purchases & Sales (CIDTA Art. 169, 176 & 183 ter / CTCA Art. 30):**
+  * **Supplier Bills (`in_invoice` / `in_refund`):** Protects corporate accounting teams against VAT and IBS deductibility disallowances. Evaluates vendor registry standing at the exact invoice date with configurable enforcement (`strict_block` or `soft_warn`).
+  * **Customer Invoices (`out_invoice` / `out_refund`):** Automatically evaluates compliance on invoices created directly or generated from Sales Orders (`sale.order`), alerting commercial teams of credit risk and **Ã‰tat 104 (Art. 183 ter CIDTA)** implications for deregistered customers while keeping sales confirmation non-blocking by default (`soft_warn`, `strict_block`, or `badge_only`).
 * **Fuzzy Name Autocomplete in Partner Dropdowns:** Overrides `res.partner._name_search` and intercepts `partner_autocomplete` to query KYB's pre-indexed database, providing instant suggestions when typing company names in invoice, sales, and purchase forms.
 * **Visual CNRC Status Badges:** Color-coded status badges on partner views:
   * <span style="color:#10b981">**ACTIF**</span> â€” Active and legally registered company.
@@ -111,6 +113,10 @@ Navigate to **Settings â†’ Technical â†’ Parameters â†’ System Pa
 | `kyb.base_url` | `https://kyb.digidevagency.dz` | Official sovereign gateway endpoint. |
 | `kyb.timeout` | `35.0` | HTTP request timeout in seconds (handles high-reliability lookups). |
 | `kyb.sovereign_autocomplete` | `True` | Intercept native autocomplete to enforce sovereign data residency (Loi 25-11). |
+| `kyb.duplicate_nif_policy` | `warn` | Duplicate NIF detection policy (`warn`, `block`, or `ignore`). |
+| `kyb.invoice_blocking_policy` | `strict_block` | Action on deregistered supplier bills (`strict_block` or `soft_warn`). |
+| `kyb.customer_invoice_policy` | `soft_warn` | Action on deregistered customer invoices (`soft_warn` Ã‰tat 104 trace, `strict_block`, or `badge_only`). |
+| `kyb.unverified_partner_policy` | `allow_warn` | Action on unverified supplier bills (`allow_warn` or `require_verify`). |
 
 > **Tip:** You can test immediately using the public sandbox key `sk_test_kyb_sandbox_key_001` with zero billing charges.
 
@@ -132,7 +138,7 @@ Test your integration safely without burning production credits using our determ
 
 * **No Secret Storage:** This connector does not store or leak your private API keys in client-side code; all API communication is executed securely server-side via Python.
 * **Law 18-07 Article 44 Strict Compliance:** Cross-border personal data transfers are strictly prohibited under Algerian law. All lookups resolve through our sovereign Algerian IP infrastructure at AlgÃ©rie TÃ©lÃ©com.
-* **Auditable Codebase:** Pure Python implementation (~150 lines in `models/res_partner.py`) allowing security teams and DSI auditors to perform exhaustive code reviews in under 5 minutes.
+* **Auditable Codebase:** Pure Python implementation allowing security teams and DSI auditors to perform exhaustive code reviews in under 5 minutes.
 
 ---
 
@@ -144,11 +150,11 @@ For detailed release history, new features, bug fixes, and upgrade notes across 
 
 | Odoo Version | Module Version Code | Market Adoption & Tier | Multi-Language (i18n) | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **Odoo 20.0** | `20.0.2.0.4` | Current Released Generation | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 19.0** | `19.0.2.0.4` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 18.0** | `18.0.2.0.4` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 17.0** | `17.0.2.0.4` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
-| **Odoo 16.0** | `16.0.2.0.4` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 20.0** | `20.0.2.0.8` | Current Released Generation | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 19.0** | `19.0.2.0.8` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 18.0** | `18.0.2.0.8` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 17.0** | `17.0.2.0.8` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 16.0** | `16.0.2.0.8` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
 
 ---
 

@@ -18,7 +18,7 @@ msgstr ""
 #. module: kyb_odoo
 #: model:ir.ui.menu,name:kyb_odoo.menu_kyb_root
 msgid "KYB Compliance"
-msgstr "Conforme KYB"
+msgstr "Conformité KYB"
 
 #. module: kyb_odoo
 #: model:ir.ui.menu,name:kyb_odoo.menu_kyb_partners
@@ -298,12 +298,12 @@ msgstr "Verdict pour '%(partner)s' : %(status)s"
 msgid ""
 "Audit en masse terminé (%(total)d factures auditées) :\n"
 "• %(compliant)d Conforme(s) (Actifs)\n"
-"• %(non_compliant)d Non Conforme(s) (Fournisseurs Radiés - Risque fiscal)\n"
+"• %(non_compliant)d Non Conforme(s) (Tiers Radiés - Risque fiscal/commercial)\n"
 "• %(warning)d Suspect(s) / Avertissement(s)"
 msgstr ""
 "Audit en masse terminé (%(total)d factures auditées) :\n"
 "• %(compliant)d Conforme(s) (Actifs)\n"
-"• %(non_compliant)d Non Conforme(s) (Fournisseurs Radiés - Risque fiscal)\n"
+"• %(non_compliant)d Non Conforme(s) (Tiers Radiés - Risque fiscal/commercial)\n"
 "• %(warning)d Suspect(s) / Avertissement(s)"
 
 #. module: kyb_odoo
@@ -311,3 +311,9 @@ msgstr ""
 #, python-format
 msgid "Audit de Masse KYB Terminé"
 msgstr "Audit de Masse KYB Terminé"
+
+#. module: kyb_odoo
+#: model:ir.model.fields,field_description:kyb_odoo.field_res_config_settings__kyb_customer_invoice_policy
+msgid "Politique Factures Clients (Ventes / État 104)"
+msgstr "Politique Factures Clients (Ventes / État 104)"
+

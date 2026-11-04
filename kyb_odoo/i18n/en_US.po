@@ -211,12 +211,12 @@ msgstr "KYB Fiscal Compliance"
 #. module: kyb_odoo
 #: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__compliant
 msgid "Conforme (Actif)"
-msgstr "Compliant (Active Supplier)"
+msgstr "Compliant (Active Partner)"
 
 #. module: kyb_odoo
 #: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__non_compliant
-msgid "Non Conforme (Fournisseur Radié)"
-msgstr "Non-Compliant (Deregistered Supplier)"
+msgid "Non Conforme (Tiers Radié)"
+msgstr "Non-Compliant (Deregistered Partner)"
 
 #. module: kyb_odoo
 #: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__warning

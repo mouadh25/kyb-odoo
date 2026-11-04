@@ -214,7 +214,7 @@ msgstr ""
 
 #. module: kyb_odoo
 #: model:ir.model.fields.selection,name:kyb_odoo.selection__account_move__kyb_compliance_status__non_compliant
-msgid "Non Conforme (Fournisseur Radié)"
+msgid "Non Conforme (Tiers Radié)"
 msgstr ""
 
 #. module: kyb_odoo

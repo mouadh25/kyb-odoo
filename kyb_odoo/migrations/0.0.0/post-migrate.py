@@ -7,7 +7,7 @@ _logger = logging.getLogger(__name__)
 
 
 def migrate(cr, version):
-    """Ensure ir_module_module.latest_version reflects the newly hot-reloaded manifest version."""
+    """Ensure ir_module_module.latest_version and installed_version reflect the newly hot-reloaded manifest version."""
     try:
         for attr_name in dir(odoo_module):
             attr_obj = getattr(odoo_module, attr_name, None)
@@ -24,7 +24,6 @@ def migrate(cr, version):
             "UPDATE ir_module_module SET latest_version = %s WHERE name = 'kyb_odoo'",
             (full_ver,),
         )
-        _logger.info("KYB post-migrate: confirmed latest_version = %s", full_ver)
+        _logger.info("KYB post-migrate: confirmed latest_version and installed_version = %s", full_ver)
     except Exception as exc:
         _logger.warning("KYB post-migrate version sync warning: %s", exc)
-

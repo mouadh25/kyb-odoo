@@ -197,10 +197,12 @@ class AccountMove(models.Model):
     def _onchange_kyb_temporal_compliance(self):
         """Re-evaluate fiscal compliance when partner or invoice date changes."""
         self._audit_temporal_compliance()
+        customer_policy = _get_config_param(self.env, "kyb.customer_invoice_policy", default="soft_warn")
         if (
             self.partner_id
             and self._is_sale_doc()
             and self.kyb_compliance_status in ("non_compliant", "warning")
+            and customer_policy != "badge_only"
         ):
             return {
                 "warning": {
@@ -217,6 +219,7 @@ class AccountMove(models.Model):
         compliant_count = 0
         non_compliant_count = 0
         warning_count = 0
+        customer_policy = _get_config_param(self.env, "kyb.customer_invoice_policy", default="soft_warn")
 
         for move in self:
             if not move.partner_id:
@@ -239,7 +242,7 @@ class AccountMove(models.Model):
                     _logger.warning("Partner JIT verification failed during invoice audit: %s", e)
 
             move._audit_temporal_compliance()
-            if move._is_sale_doc():
+            if move._is_sale_doc() and customer_policy != "badge_only":
                 move._post_sale_chatter_alert_if_needed()
 
             if move.kyb_compliance_status == "compliant":
@@ -379,6 +382,10 @@ class AccountMove(models.Model):
 
     def _post_sale_chatter_alert_if_needed(self):
         """Post a single non-blocking HTML warning box in the Chatter for deregistered/suspended customers."""
+        customer_policy = _get_config_param(self.env, "kyb.customer_invoice_policy", default="soft_warn")
+        if customer_policy == "badge_only":
+            return
+
         for move in self:
             partner = move.partner_id
             if not (
@@ -431,6 +438,7 @@ class AccountMove(models.Model):
 
         audit_enabled = _get_config_bool(self.env, "kyb.invoice_audit_enabled", default=True)
         blocking_policy = _get_config_param(self.env, "kyb.invoice_blocking_policy", default="strict_block")
+        customer_policy = _get_config_param(self.env, "kyb.customer_invoice_policy", default="soft_warn")
         unverified_policy = _get_config_param(self.env, "kyb.unverified_partner_policy", default="allow_warn")
 
         if audit_enabled:
@@ -499,9 +507,27 @@ class AccountMove(models.Model):
                             % {"partner": partner.name}
                         )
 
-                # Branch B: Sale Documents (Customer Invoices / Refunds) — Always Non-Blocking with Chatter Alert
+                # Branch B: Sale Documents (Customer Invoices / Refunds) — Configurable via kyb.customer_invoice_policy
                 elif move._is_sale_doc():
-                    move._post_sale_chatter_alert_if_needed()
+                    if move.kyb_compliance_status == "non_compliant" and customer_policy == "strict_block":
+                        date_str = str(partner.kyb_date_radiation) if partner.kyb_date_radiation else _("Date non précisée")
+                        inv_str = str(move.invoice_date or fields.Date.context_today(move))
+                        raise UserError(
+                            _("⛔ FACTURATION CLIENT INTERROMPUE (Contrôle Registre KYB)\n\n"
+                              "Réglementation applicable : Article 183 ter du CIDTA (État 104 Clients) & Gouvernance Crédit Client.\n\n"
+                              "Le client '%(partner)s' est enregistré comme radié au registre officiel en date du %(rad_date)s.\n"
+                              "La facture de vente %(move_name)s est datée du %(inv_date)s (postérieurement à la date de radiation enregistrée).\n\n"
+                              "La politique de votre entreprise est configurée sur 'Blocage Strict' pour les clients radiés.\n"
+                              "Pour autoriser la facturation avec alerte non-bloquante (mode recommandé), modifiez 'Action sur Client Radié' dans Paramètres → KYB Compliance.")
+                            % {
+                                "partner": partner.name,
+                                "rad_date": date_str,
+                                "move_name": move.name or _("Brouillon"),
+                                "inv_date": inv_str,
+                            }
+                        )
+                    elif customer_policy != "badge_only":
+                        move._post_sale_chatter_alert_if_needed()
 
         self_ctx = self.with_context(kyb_action_post_done=True) if hasattr(self, "with_context") else self
         return super(AccountMove, self_ctx).action_post() if hasattr(super(), "action_post") else True

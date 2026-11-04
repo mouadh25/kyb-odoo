@@ -23,20 +23,24 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 ---
 
-## [2.0.8] - 2026-11-03
+## [2.0.8] - 2026-11-04
 
 ### Added
-* **Non-Blocking Commercial Risk & État 104 Compliance Alerts for Customer Invoices (`out_invoice` / `out_refund`):**
-  * Automatically evaluates `kyb_compliance_status` upon `account.move.create()` and `write()` so invoices generated from Sales Orders (`sale.order` -> *Créer une facture*) or Purchase Orders immediately display their compliance status (`compliant`, `warning`, `non_compliant`) without requiring manual audit button clicks.
-  * Displays a non-blocking warning dialog (`⚠️ Alerte Risque Commercial (Client Radié)`) when selecting a deregistered (`RADIE`) or suspended (`SUSPENDU`) customer on a Customer Invoice via `@api.onchange`.
-  * Performs 24-hour JIT verification and posts a non-blocking commercial credit risk & **État 104 (Art. 183 ter CIDTA)** warning note (`mail.mt_note`) in the invoice Chatter upon `action_post()` for deregistered customers while keeping confirmation non-blocking (output VAT remains collectible).
+* **Configurable Customer Invoice Compliance Governance (`kyb.customer_invoice_policy` — Ventes & État 104):**
+  * Added **Action sur Client Radié (Ventes / État 104)** in **Settings → KYB Compliance** with 3 enterprise governance modes:
+    * `soft_warn` (**Default — Recommended**): *Avertissement & Traçabilité État 104* — Allows confirming Customer Invoices (`out_invoice` / `out_refund`) while displaying a non-blocking warning notification on selection and logging a deduplicated **`Signalement Risque Commercial & État 104 (Client Radié — Non-Bloquant)`** alert box in the invoice Chatter (`mail.mt_note`).
+    * `strict_block`: *Blocage Strict* — Prevents posting Customer Invoices for deregistered customers (`⛔ FACTURATION CLIENT INTERROMPUE` referencing **Art. 183 ter du CIDTA**).
+    * `badge_only`: *Badge Uniquement* — Updates `kyb_compliance_status` (`Non Conforme (Tiers Radié)`) and the KYB tab audit report silently without modal dialogs or Chatter notes on sales invoices.
+  * Automatically evaluates `kyb_compliance_status` upon `account.move.create()` and `write()` so invoices generated from Sales Orders (`sale.order` -> *Créer une facture*) or Purchase Orders immediately display their compliance status (`compliant`, `warning`, `non_compliant`) in Draft state without requiring manual audit clicks.
   * Preserves strict configurable blocking (`strict_block` / `soft_warn`) on Purchase Bills (`in_invoice` / `in_refund`) under Articles 169 & 176 CIDTA and Article 30 CTCA.
-* **In-Memory Python Hot-Reload during 1-Click Upgrades (`migrations/0.0.0/pre-migrate.py`):**
-  * Automatically purges cached `odoo.addons.kyb_odoo` modules from `sys.modules` during `button_immediate_upgrade()` so 1-click in-app updates apply Python model changes immediately without requiring a container restart.
+* **In-Memory Python Hot-Reload during 1-Click Upgrades (`migrations/0.0.0/pre-migrate.py` & `post-migrate.py`):**
+  * Automatically reloads `odoo.addons.kyb_odoo` modules in-place (`importlib.reload`) and refreshes ORM model hooks during `button_immediate_upgrade()`, ensuring 1-click in-app updates apply Python model changes immediately with zero container restarts.
 
 ### Fixed
 * **Suppressed Duplicate ORM Field-Diff Tracking on Partner Re-Verification:**
   * Applied `tracking_disable=True` and `mail_notrack=True` at the entry of `ResPartner._do_kyb_resolve()` for existing records so re-verifying a partner posts only the institutional KYB card.
+* **Accurate Invoice Telemetry Counters & Role-Neutral Labels:**
+  * Aligned `_gather_instance_telemetry()` with `kyb_compliance_status` on `account.move` and standardized invoice badge labels across all languages to **Tiers Radié** / **Tiers Actif (Vérifié)**.
 
 ## [2.0.7] - 2026-10-27
 

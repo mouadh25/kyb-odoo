@@ -335,7 +335,7 @@ class ResConfigSettings(models.TransientModel):
     def action_check_kyb_update(self):
         """Manually triggers version check and telemetry heartbeat to KYB Gateway."""
         import requests
-        base_url = (self.kyb_base_url or "https://kyb.digidevagency.dz").rstrip("/")
+        base_url = (_get_config_param(self.env, "kyb.base_url") or self.kyb_base_url or "https://kyb.digidevagency.dz").rstrip("/")
         api_key = self.kyb_api_key or ""
         telemetry_data = self._gather_instance_telemetry()
 
@@ -425,7 +425,7 @@ class ResConfigSettings(models.TransientModel):
                   "Veuillez mettre à jour le module via Git ou votre gestionnaire de conteneurs.") % module_path
             )
 
-        base_url = (self.kyb_base_url or "https://kyb.digidevagency.dz").rstrip("/")
+        base_url = (_get_config_param(self.env, "kyb.base_url") or self.kyb_base_url or "https://kyb.digidevagency.dz").rstrip("/")
         download_url = f"{base_url}/api/v1/downloads/kyb_odoo.zip"
         _logger.info("Downloading KYB module update from: %s", download_url)
 
@@ -473,24 +473,25 @@ class ResConfigSettings(models.TransientModel):
                 shutil.rmtree(temp_extract_dir, ignore_errors=True)
                 _logger.info("KYB module files updated cleanly in %s", module_path)
 
-                # Ensure manifest on disk has series prefix if running in Odoo 16+
+                # Ensure manifest on disk has canonical 3-part version so Odoo's adapt_version() prefixes each container's series cleanly
                 try:
                     import re
                     from odoo import release
                     series = getattr(release, "serie", None) or getattr(release, "major_version", "")
                     manifest_file = os.path.join(module_path, "__manifest__.py")
-                    if series and os.path.exists(manifest_file):
+                    if os.path.exists(manifest_file):
                         with open(manifest_file, "r", encoding="utf-8") as mf:
                             mf_text = mf.read()
-                        m_ver = re.search(r'"version":\s*"(\d+\.\d+\.\d+)"', mf_text)
-                        raw_v = m_ver.group(1) if m_ver else "2.0.8"
-                        mf_updated = re.sub(r'"version":\s*"(\d+\.\d+\.\d+)"', f'"version": "{series}.\\1"', mf_text)
+                        mf_updated = re.sub(r'"version":\s*"(?:\d+\.\d+\.)?(\d+\.\d+\.\d+)"', r'"version": "\1"', mf_text)
                         with open(manifest_file, "w", encoding="utf-8") as mf:
                             mf.write(mf_updated)
+                        m_ver = re.search(r'"version":\s*"(\d+\.\d+\.\d+)"', mf_updated)
+                        raw_v = m_ver.group(1) if m_ver else "2.0.8"
                         mig_0 = os.path.join(module_path, "migrations", "0.0.0")
-                        mig_target = os.path.join(module_path, "migrations", f"{series}.{raw_v}")
-                        if os.path.exists(mig_0) and not os.path.exists(mig_target):
-                            shutil.copytree(mig_0, mig_target, dirs_exist_ok=True)
+                        if os.path.exists(mig_0):
+                            for s_pref in ("16.0", "17.0", "18.0", "19.0", "20.0"):
+                                mig_target = os.path.join(module_path, "migrations", f"{s_pref}.{raw_v}")
+                                shutil.copytree(mig_0, mig_target, dirs_exist_ok=True)
                 except Exception as exc_mf:
                     _logger.warning("KYB manifest series alignment note: %s", exc_mf)
 

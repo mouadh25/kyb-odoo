@@ -2,6 +2,7 @@
 import importlib
 import logging
 import os
+import re
 import sys
 from odoo import models, release
 from odoo.modules import module as odoo_module
@@ -30,6 +31,19 @@ def migrate(cr, version):
                 except Exception:
                     pass
 
+        # Ensure __manifest__.py on disk has canonical 3-part version so adapt_version() works across shared containers
+        manifest_file = os.path.join(addon_dir, "__manifest__.py")
+        if os.path.exists(manifest_file):
+            try:
+                with open(manifest_file, "r", encoding="utf-8") as mf:
+                    mf_text = mf.read()
+                mf_clean = re.sub(r'"version":\s*"(?:\d+\.\d+\.)?(\d+\.\d+\.\d+)"', r'"version": "\1"', mf_text)
+                if mf_clean != mf_text:
+                    with open(manifest_file, "w", encoding="utf-8") as mf:
+                        mf.write(mf_clean)
+            except Exception:
+                pass
+
         # 2. Clear cached manifest dictionaries in odoo.modules.module (@lru_cache)
         for attr_name in dir(odoo_module):
             attr_obj = getattr(odoo_module, attr_name, None)
@@ -39,16 +53,30 @@ def migrate(cr, version):
                 except Exception:
                     pass
 
-        # 3. Purge cached kyb_odoo model classes in MetaModel.module_to_models and sys.modules,
+        # 3. Purge cached kyb_odoo model classes in MetaModel.module_to_models (in-place clear!) and sys.modules,
         #    then immediately re-import odoo.addons.kyb_odoo so registry.load(cr, package)
-        #    registers the freshly updated classes in memory.
-        meta_cls = type(models.Model)
-        mod_map = getattr(meta_cls, "module_to_models", None)
-        if isinstance(mod_map, dict):
-            mod_map["kyb_odoo"] = []
+        #    registers only the freshly updated classes in memory.
+        candidate_metas = [type(models.Model), getattr(models, "MetaModel", None)]
+        try:
+            from odoo.orm import models as orm_models
+            candidate_metas.append(getattr(orm_models, "MetaModel", None))
+        except Exception:
+            pass
+
+        mod_map = None
+        for mc in candidate_metas:
+            if mc is None:
+                continue
+            mm = getattr(mc, "module_to_models", None)
+            if isinstance(mm, dict):
+                mod_map = mm
+                if "kyb_odoo" in mm and isinstance(mm["kyb_odoo"], list):
+                    mm["kyb_odoo"].clear()
+                else:
+                    mm["kyb_odoo"] = []
 
         for mod_name in list(sys.modules.keys()):
-            if mod_name == "odoo.addons.kyb_odoo" or mod_name.startswith("odoo.addons.kyb_odoo."):
+            if mod_name in ("odoo.addons.kyb_odoo", "kyb_odoo") or mod_name.startswith("odoo.addons.kyb_odoo.") or mod_name.startswith("kyb_odoo."):
                 sys.modules.pop(mod_name, None)
 
         importlib.invalidate_caches()

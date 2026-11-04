@@ -32,7 +32,7 @@
                 <page string="Conformité &amp; Statut Registre KYB" name="kyb_audit_tab">
                     <div class="alert alert-info d-flex justify-content-between align-items-center mb-3" role="alert">
                         <div>
-                            <strong>Audit Temporel KYB</strong> — Vérification du statut officiel au registre du commerce à la date d'émission (réf. Art. 169 &amp; 176 CIDTA / Art. 30 CTCA).
+                            <strong>Audit Temporel KYB</strong> — Vérification du statut officiel au registre du commerce à la date d'émission (réf. Art. 169, 176 &amp; 183 ter CIDTA / Art. 30 CTCA).
                         </div>
                         <button name="action_verify_kyb_compliance"
                                 type="object"
@@ -48,11 +48,11 @@
                                    decoration-danger="kyb_compliance_status == 'non_compliant'"
                                    decoration-warning="kyb_compliance_status == 'warning'"
                                    decoration-muted="kyb_compliance_status == 'unverified'"/>
-                            <field name="kyb_tax_deductible" string="Fournisseur Actif" widget="boolean_toggle"/>
+                            <field name="kyb_tax_deductible" string="Tiers Actif (Vérifié)" widget="boolean_toggle"/>
                             <field name="kyb_audit_date"/>
                             <field name="kyb_compliance_message"/>
                         </group>
-                        <group string="Références Légales &amp; Situation Fournisseur">
+                        <group string="Références Légales &amp; Situation du Tiers">
                             <field name="kyb_vendor_statut_cnrc" widget="badge"
                                    decoration-success="kyb_vendor_statut_cnrc == 'ACTIF'"
                                    decoration-danger="kyb_vendor_statut_cnrc == 'RADIE'"
@@ -67,7 +67,7 @@
                     <div class="mt-3">
                         <button name="action_verify_kyb_compliance"
                                 type="object"
-                                string="Vérifier Statut Fournisseur (KYB)"
+                                string="Vérifier Statut Tiers (KYB)"
                                 class="btn btn-outline-primary"
                                 icon="fa-shield"/>
                     </div>

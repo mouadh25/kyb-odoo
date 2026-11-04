@@ -27,3 +27,4 @@ def migrate(cr, version):
         _logger.info("KYB post-migrate: confirmed latest_version = %s", full_ver)
     except Exception as exc:
         _logger.warning("KYB post-migrate version sync warning: %s", exc)
+

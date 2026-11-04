@@ -33,19 +33,19 @@ class AccountMove(models.Model):
             ("unverified", "Non Vérifié"),
             ("compliant", "Conforme (Actif)"),
             ("warning", "Attention / Risque"),
-            ("non_compliant", "Non Conforme (Fournisseur Radié)"),
+            ("non_compliant", "Non Conforme (Tiers Radié)"),
         ],
         string="Conformité Fiscale KYB",
         default="unverified",
         tracking=True,
         copy=False,
-        help="Statut de conformité temporelle selon les Art. 169 & 176 CIDTA et Art. 30 CTCA.",
+        help="Statut de conformité temporelle (Art. 169, 176 & 183 ter CIDTA et Art. 30 CTCA).",
     )
     kyb_compliance_message = fields.Text(
         string="Audit Temporel KYB",
         readonly=True,
         copy=False,
-        help="Rapport d'audit de déductibilité fiscale.",
+        help="Rapport d'audit de conformité fiscale et commerciale.",
     )
     kyb_audit_date = fields.Datetime(
         string="Date d'Audit KYB",
@@ -54,34 +54,34 @@ class AccountMove(models.Model):
         help="Date et heure précises de la dernière vérification KYB.",
     )
     kyb_tax_deductible = fields.Boolean(
-        string="Fournisseur Actif (Vérifié)",
+        string="Tiers Actif (Vérifié)",
         readonly=True,
         copy=False,
         help="Indicateur de statut actif au registre du commerce à la date d'émission (réf. Art. 169 & 176 CIDTA / Art. 30 CTCA).",
     )
     kyb_vendor_statut_cnrc = fields.Selection(
         related="partner_id.kyb_statut_cnrc",
-        string="Statut CNRC Fournisseur",
+        string="Statut CNRC",
         readonly=True,
     )
     kyb_vendor_forme_juridique = fields.Char(
         related="partner_id.kyb_forme_juridique",
-        string="Forme Juridique Fournisseur",
+        string="Forme Juridique",
         readonly=True,
     )
     kyb_vendor_nif = fields.Char(
         related="partner_id.kyb_nif",
-        string="NIF Fournisseur",
+        string="NIF (Identifiant Fiscal)",
         readonly=True,
     )
     kyb_vendor_rc = fields.Char(
         related="partner_id.kyb_rc",
-        string="RC Fournisseur",
+        string="Numéro RC",
         readonly=True,
     )
     kyb_vendor_date_radiation = fields.Date(
         related="partner_id.kyb_date_radiation",
-        string="Date Radiation Fournisseur",
+        string="Date de Radiation",
         readonly=True,
     )
 
@@ -239,6 +239,8 @@ class AccountMove(models.Model):
                     _logger.warning("Partner JIT verification failed during invoice audit: %s", e)
 
             move._audit_temporal_compliance()
+            if move._is_sale_doc():
+                move._post_sale_chatter_alert_if_needed()
 
             if move.kyb_compliance_status == "compliant":
                 compliant_count += 1
@@ -375,6 +377,47 @@ class AccountMove(models.Model):
                     f"Le partenaire '{partner.name}' n'a pas encore fait l'objet d'une vérification sur le registre KYB."
                 )
 
+    def _post_sale_chatter_alert_if_needed(self):
+        """Post a single non-blocking HTML warning box in the Chatter for deregistered/suspended customers."""
+        for move in self:
+            partner = move.partner_id
+            if not (
+                move._is_sale_doc()
+                and move.kyb_compliance_status in ("non_compliant", "warning")
+                and partner
+                and (
+                    "RAD" in (partner.kyb_statut_cnrc or "").upper()
+                    or "مشطب" in (partner.kyb_statut_cnrc or "")
+                    or "SUSP" in (partner.kyb_statut_cnrc or "").upper()
+                )
+            ):
+                continue
+
+            # Deduplicate any previous Signalement Risque Commercial notes on this invoice
+            try:
+                if "mail.message" in self.env and isinstance(move.id, int) and move.id > 0:
+                    existing = self.env["mail.message"].sudo().search([
+                        ("model", "=", "account.move"),
+                        ("res_id", "=", move.id),
+                        ("body", "ilike", "Signalement Risque Commercial"),
+                    ])
+                    if existing:
+                        existing.unlink()
+            except Exception:
+                pass
+
+            msg_html = (move.kyb_compliance_message or "").replace("\n", "<br/>")
+            move.message_post(
+                body=Markup(
+                    f"<div class='alert alert-warning'>"
+                    f"<strong>Signalement Risque Commercial &amp; État 104 (Client Radié — Non-Bloquant) :</strong><br/>"
+                    f"{msg_html}"
+                    f"</div>"
+                ),
+                message_type="notification",
+                subtype_xmlid="mail.mt_note",
+            )
+
     def action_post(self):
         """
         Override action_post to enforce compliance policies:
@@ -383,6 +426,9 @@ class AccountMove(models.Model):
         - Sale documents (Customer Invoices): Perform JIT verification and post a non-blocking
           Chatter warning note when billing a deregistered (radié) customer (credit risk & État 104 audit trail).
         """
+        if getattr(self.env, "context", {}).get("kyb_action_post_done"):
+            return super().action_post() if hasattr(super(), "action_post") else True
+
         audit_enabled = _get_config_bool(self.env, "kyb.invoice_audit_enabled", default=True)
         blocking_policy = _get_config_param(self.env, "kyb.invoice_blocking_policy", default="strict_block")
         unverified_policy = _get_config_param(self.env, "kyb.unverified_partner_policy", default="allow_warn")
@@ -455,24 +501,10 @@ class AccountMove(models.Model):
 
                 # Branch B: Sale Documents (Customer Invoices / Refunds) — Always Non-Blocking with Chatter Alert
                 elif move._is_sale_doc():
-                    if move.kyb_compliance_status in ("non_compliant", "warning") and partner and (
-                        "RAD" in (partner.kyb_statut_cnrc or "").upper()
-                        or "مشطب" in (partner.kyb_statut_cnrc or "")
-                        or "SUSP" in (partner.kyb_statut_cnrc or "").upper()
-                    ):
-                        msg_html = (move.kyb_compliance_message or "").replace("\n", "<br/>")
-                        move.message_post(
-                            body=Markup(
-                                f"<div class='alert alert-warning'>"
-                                f"<strong>Signalement Risque Commercial &amp; État 104 (Client Radié — Non-Bloquant) :</strong><br/>"
-                                f"{msg_html}"
-                                f"</div>"
-                            ),
-                            message_type="notification",
-                            subtype_xmlid="mail.mt_note",
-                        )
+                    move._post_sale_chatter_alert_if_needed()
 
-        return super().action_post() if hasattr(super(), "action_post") else True
+        self_ctx = self.with_context(kyb_action_post_done=True) if hasattr(self, "with_context") else self
+        return super(AccountMove, self_ctx).action_post() if hasattr(super(), "action_post") else True
 
     # ──────────────── End-of-Month Global Audit (G50 Safety Net) ──────────────────
 

@@ -482,9 +482,15 @@ class ResConfigSettings(models.TransientModel):
                     if series and os.path.exists(manifest_file):
                         with open(manifest_file, "r", encoding="utf-8") as mf:
                             mf_text = mf.read()
+                        m_ver = re.search(r'"version":\s*"(\d+\.\d+\.\d+)"', mf_text)
+                        raw_v = m_ver.group(1) if m_ver else "2.0.8"
                         mf_updated = re.sub(r'"version":\s*"(\d+\.\d+\.\d+)"', f'"version": "{series}.\\1"', mf_text)
                         with open(manifest_file, "w", encoding="utf-8") as mf:
                             mf.write(mf_updated)
+                        mig_0 = os.path.join(module_path, "migrations", "0.0.0")
+                        mig_target = os.path.join(module_path, "migrations", f"{series}.{raw_v}")
+                        if os.path.exists(mig_0) and not os.path.exists(mig_target):
+                            shutil.copytree(mig_0, mig_target, dirs_exist_ok=True)
                 except Exception as exc_mf:
                     _logger.warning("KYB manifest series alignment note: %s", exc_mf)
 

@@ -455,20 +455,31 @@ class ResConfigSettings(models.TransientModel):
                 if os.path.exists(os.path.join(temp_extract_dir, "kyb_odoo", "__manifest__.py")):
                     source_root = os.path.join(temp_extract_dir, "kyb_odoo")
 
-                for item in os.listdir(source_root):
-                    src_item = os.path.join(source_root, item)
-                    dst_item = os.path.join(module_path, item)
-                    if os.path.isdir(src_item):
-                        if os.path.exists(dst_item):
-                            shutil.rmtree(dst_item, ignore_errors=True)
-                        shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
-                    else:
-                        if os.path.exists(dst_item):
+                for root, dirs, files in os.walk(source_root):
+                    rel = os.path.relpath(root, source_root)
+                    target_dir = os.path.join(module_path, rel) if rel != "." else module_path
+                    os.makedirs(target_dir, exist_ok=True)
+                    try:
+                        os.chmod(target_dir, 0o777)
+                    except Exception:
+                        pass
+                    for f in files:
+                        s_path = os.path.join(root, f)
+                        d_path = os.path.join(target_dir, f)
+                        try:
+                            if os.path.exists(d_path):
+                                try:
+                                    os.chmod(d_path, 0o666)
+                                except Exception:
+                                    pass
+                            with open(s_path, "rb") as sf, open(d_path, "wb") as df:
+                                df.write(sf.read())
                             try:
-                                os.remove(dst_item)
+                                os.chmod(d_path, 0o666)
                             except Exception:
                                 pass
-                        shutil.copy2(src_item, dst_item)
+                        except Exception as e_f:
+                            _logger.warning("KYB update copy file warning for %s: %s", d_path, e_f)
 
                 shutil.rmtree(temp_extract_dir, ignore_errors=True)
                 _logger.info("KYB module files updated cleanly in %s", module_path)
@@ -491,7 +502,26 @@ class ResConfigSettings(models.TransientModel):
                         if os.path.exists(mig_0):
                             for s_pref in ("16.0", "17.0", "18.0", "19.0", "20.0"):
                                 mig_target = os.path.join(module_path, "migrations", f"{s_pref}.{raw_v}")
-                                shutil.copytree(mig_0, mig_target, dirs_exist_ok=True)
+                                os.makedirs(mig_target, exist_ok=True)
+                                try:
+                                    os.chmod(mig_target, 0o777)
+                                except Exception:
+                                    pass
+                                for f in os.listdir(mig_0):
+                                    sp = os.path.join(mig_0, f)
+                                    dp = os.path.join(mig_target, f)
+                                    if os.path.isfile(sp):
+                                        try:
+                                            if os.path.exists(dp):
+                                                try:
+                                                    os.chmod(dp, 0o666)
+                                                except Exception:
+                                                    pass
+                                            with open(sp, "rb") as sf, open(dp, "wb") as df:
+                                                df.write(sf.read())
+                                            os.chmod(dp, 0o666)
+                                        except Exception:
+                                            pass
                 except Exception as exc_mf:
                     _logger.warning("KYB manifest series alignment note: %s", exc_mf)
 

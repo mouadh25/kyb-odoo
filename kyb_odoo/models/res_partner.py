@@ -880,10 +880,12 @@ class ResPartner(models.Model):
             now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
                 '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; margin: 2px 0;">'
-                f'<div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid #e4e4e7; margin-bottom: 8px;">'
-                f'<strong style="color: #18181b; font-size: 13px; font-weight: 600;">{_("Vérification KYB")}</strong>'
-                f'<span style="background: {badge_color}; color: white; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; display: inline-block;">{badge_text}</span>'
-                f'</div>'
+                '<table style="width: 100%; border-bottom: 1px solid #e4e4e7; margin-bottom: 8px; padding-bottom: 4px;">'
+                '<tr>'
+                f'<td style="text-align: left; vertical-align: middle;"><strong style="color: #18181b; font-size: 13px; font-weight: 600;">{_("Vérification KYB")}</strong></td>'
+                f'<td style="text-align: right; vertical-align: middle;"><span style="background-color: {badge_color} !important; color: #ffffff !important; padding: 3px 10px !important; border-radius: 9999px !important; font-size: 11px !important; font-weight: 700 !important; display: inline-block !important; text-transform: uppercase !important; letter-spacing: 0.05em !important;">{badge_text}</span></td>'
+                '</tr>'
+                '</table>'
                 f'<table style="width: 100%; font-size: 12px; border-collapse: collapse;">{rows_html}</table>'
                 f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid #e4e4e7; padding-top: 4px;">'
                 f'{_("Consultation Registre Officiel")} · {now_str}'
@@ -1799,8 +1801,8 @@ class ResPartner(models.Model):
             except Exception as exc:
                 _logger.info("KYB resolve in enrich_by_duns for '%s' did not find immediate profile (%s), trying fallback enrich...", clean_duns, exc)
 
-        # Fallback 1: If resolve misses or returned partial data without NIF, attempt targeted enrich
-        if not data or not isinstance(data, dict) or not data.get("nif"):
+        # Fallback 1: If resolve misses or returned partial data without NIF or deep governance (capital/gerant), attempt targeted enrich
+        if not data or not isinstance(data, dict) or not data.get("nif") or not (data.get("capital_social") or data.get("representant_legal")):
             try:
                 if not client:
                     client = _get_kyb_client(self.env)
@@ -1812,7 +1814,8 @@ class ResPartner(models.Model):
                     or (clean_duns if any(c.isdigit() for c in clean_duns) and any(c.isalpha() for c in clean_duns) else "")
                 )
                 nif_cand = (
-                    candidate_ctx.get("vat")
+                    (data.get("nif") if isinstance(data, dict) else "")
+                    or candidate_ctx.get("vat")
                     or candidate_ctx.get("nif")
                     or (clean_duns if clean_duns.isdigit() and len(clean_duns) in (15, 20) else "")
                 )
@@ -1826,7 +1829,7 @@ class ResPartner(models.Model):
                         rc_number=rc_cand,
                         nif=nif_cand,
                         raison_sociale=name_cand,
-                        force_live=True if (not data or not data.get("nif")) else False,
+                        force_live=True if (not data or not (data.get("capital_social") or data.get("representant_legal"))) else False,
                     )
                     if isinstance(enrich_resp, dict) and enrich_resp.get("entity"):
                         enriched_entity = enrich_resp["entity"]

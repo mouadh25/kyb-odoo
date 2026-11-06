@@ -225,6 +225,124 @@ def _split_algerian_commune_wilaya(raw_str: Optional[str]) -> Tuple[str, str, st
         commune_clean = ""
 
     return (commune_clean, wilaya_clean, wilaya_code)
+
+
+def _parse_algerian_address_components(
+    raw_adresse: Optional[str],
+    raw_wilaya: Optional[str],
+    raw_code_postal: Optional[str] = None,
+) -> dict:
+    """
+    Parses CNRC/DGI Algerian address data into clean Odoo fields:
+    street (Rue), street2 (Commune), city (Ville/Commune), zip (Code postal 5 digits),
+    wilaya_name, wilaya_code.
+    Handles:
+    - Code postal in format 'BERRIANE (47100)' or 'SETIF RP (19000)' or '16050'
+    - Inline ', Commune X, Wilaya de Y' inside adresse
+    - Slash format 'COMMUNE/WILAYA'
+    """
+    adresse_str = (raw_adresse or "").strip()
+    wilaya_str = (raw_wilaya or "").strip()
+    cp_str = (raw_code_postal or "").strip()
+
+    # 1. Extract 5-digit postal code and postal locality from code_postal (e.g. 'BERRIANE (47100)' or 'SETIF RP (19000)')
+    zip_code = ""
+    cp_commune = ""
+    if cp_str and cp_str.lower() not in ("none", "null", "false", "-", "n/a"):
+        m_cp = re.search(r"\b(\d{5})\b", cp_str)
+        if m_cp:
+            zip_code = m_cp.group(1)
+        cp_label = re.sub(r"\(\s*\d{5}\s*\)", "", cp_str).replace(zip_code, "").strip(" -/,()")
+        cp_label = re.sub(r"\b(RP|WILAYA|PRINCIPAL|CENTRE)\b", "", cp_label, flags=re.I).strip(" -/,()")
+        if cp_label and len(cp_label) >= 2:
+            cp_commune = cp_label.title()
+
+    # 2. Extract base commune/wilaya from raw_wilaya or slash-separated address
+    commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(wilaya_str or adresse_str)
+
+    # 3. Extract inline 'Commune X' and 'Wilaya de Y' from adresse_str and strip from street
+    clean_street = adresse_str
+    inline_commune = ""
+    inline_wilaya = ""
+
+    m_inline_c = re.search(r"(?:,\s*|\b)Commune\s+(?:de\s+|d['’])?([^,/]+)", clean_street, flags=re.I)
+    if m_inline_c:
+        inline_commune = m_inline_c.group(1).strip(" ,.-").title()
+
+    m_inline_w = re.search(r"(?:,\s*|\b)Wilaya\s+(?:de\s+|d['’])?([^,/]+)", clean_street, flags=re.I)
+    if m_inline_w:
+        inline_wilaya = m_inline_w.group(1).strip(" ,.-").title()
+
+    # Remove trailing ', Commune ..., Wilaya de ...' from street so street only holds the physical street/lot/zone
+    clean_street = re.sub(r",?\s*\bCommune\s+(?:de\s+|d['’])?[^,/]+", "", clean_street, flags=re.I)
+    clean_street = re.sub(r",?\s*\bWilaya\s+(?:de\s+|d['’])?[^,/]+", "", clean_street, flags=re.I)
+    clean_street = clean_street.strip(" ,.-/")
+
+    # If clean_street ends with ', <Wilaya>' or ', <Commune> <Wilaya>', strip the trailing wilaya suffix
+    m_trail = re.search(r",\s*([^,]+)$", clean_street)
+    if m_trail:
+        trail_part = m_trail.group(1).strip()
+        _, w_tr, wc_tr = _split_algerian_commune_wilaya(trail_part)
+        if wc_tr:
+            if not inline_wilaya:
+                inline_wilaya = w_tr
+            clean_street = clean_street[:m_trail.start()].strip(" ,.-/")
+
+    if "/" in clean_street:
+        c_sl, w_sl, w_code_sl = _split_algerian_commune_wilaya(clean_street)
+        if w_code_sl:
+            if c_sl and not inline_commune:
+                inline_commune = c_sl
+            if w_sl and not inline_wilaya:
+                inline_wilaya = w_sl
+            clean_street = ""
+
+    # Resolve final Wilaya
+    if not wilaya_code and inline_wilaya:
+        _, w_res, wc_res = _split_algerian_commune_wilaya(inline_wilaya)
+        if wc_res:
+            wilaya_name, wilaya_code = w_res, wc_res
+        elif not wilaya_name:
+            wilaya_name = inline_wilaya
+
+    if not wilaya_code and zip_code and zip_code[:2] in ALGERIAN_WILAYAS_69:
+        wilaya_code = zip_code[:2]
+        wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
+
+    # Resolve final Commune
+    final_commune = commune_name or inline_commune or cp_commune
+    if final_commune and wilaya_name and final_commune.lower() == wilaya_name.lower():
+        # If commune is identical to Wilaya chef-lieu, keep city as Wilaya chef-lieu
+        pass
+
+    # If clean_street is just the bare wilaya name (e.g. 'ALGER' or 'ORAN'), don't duplicate it as street if we have commune/wilaya
+    if clean_street and wilaya_name and clean_street.strip().lower() == wilaya_name.lower():
+        clean_street = f"Siège Social, {final_commune or wilaya_name}"
+    elif not clean_street:
+        if final_commune and wilaya_name and final_commune.lower() != wilaya_name.lower():
+            clean_street = f"Commune {final_commune}, Wilaya de {wilaya_name}"
+        elif wilaya_name:
+            clean_street = f"Wilaya de {wilaya_name}"
+
+    # Street2 holds Commune when distinct from street and Wilaya, or complements the address
+    street2_val = ""
+    if final_commune:
+        if wilaya_name and final_commune.lower() != wilaya_name.lower():
+            street2_val = f"Commune de {final_commune}"
+        elif wilaya_name:
+            street2_val = f"Commune de {final_commune}"
+
+    city_val = final_commune or wilaya_name or ""
+
+    return {
+        "street": clean_street or False,
+        "street2": street2_val or False,
+        "city": city_val or False,
+        "zip": zip_code or False,
+        "commune_name": final_commune,
+        "wilaya_name": wilaya_name,
+        "wilaya_code": wilaya_code,
+    }
  
  
 class _NativeSearchNamespace:
@@ -742,9 +860,9 @@ class ResPartner(models.Model):
         if has_kyb:
             # mail_create_nolog=True: suppress Odoo's built-in "Contact créé" log message.
             # The institutional KYB card from _post_kyb_audit_log() is the sole chatter entry.
-            # mail_notrack=True: belt-and-suspenders — suppress any residual field tracking on creation.
+            # tracking_disable=True & mail_notrack=True: suppress all field tracking diffs on creation.
             records = super(ResPartner, self.with_context(
-                mail_create_nolog=True, mail_notrack=True
+                mail_create_nolog=True, mail_notrack=True, tracking_disable=True
             )).create(vals_list)
         else:
             records = super().create(vals_list)
@@ -772,6 +890,22 @@ class ResPartner(models.Model):
                 vals["kyb_rc"] = fmt_rc
                 if "company_registry" in self._fields:
                     vals["company_registry"] = fmt_rc
+        # Suppress ORM field-diff tracking chatter when saving KYB-enriched fields
+        kyb_write_keys = {
+            "kyb_nif", "kyb_rc", "kyb_nis", "kyb_statut_cnrc",
+            "kyb_capital_social", "kyb_representant_legal", "kyb_forme_juridique",
+            "kyb_activite", "kyb_nae_codes", "kyb_activites_rc",
+            "kyb_date_creation", "kyb_date_radiation", "kyb_last_verified"
+        }
+        if any(k in vals for k in kyb_write_keys):
+            res = super(ResPartner, self.with_context(tracking_disable=True, mail_notrack=True)).write(vals)
+            # If this write populated KYB verification data (e.g. when selecting from autocomplete on an existing draft),
+            # ensure the green/red institutional KYB card is posted/updated in chatter.
+            if not (getattr(self.env, "context", None) or {}).get("kyb_skip_audit_post"):
+                for rec in self:
+                    if (rec.kyb_nif or rec.kyb_rc) and rec.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU"):
+                        rec.with_context(kyb_skip_audit_post=True)._post_kyb_audit_log()
+            return res
         return super().write(vals)
 
     @api.constrains("kyb_nif", "vat")
@@ -821,81 +955,98 @@ class ResPartner(models.Model):
                 continue
             # Strict Chatter Deduplication Guard: Remove generic creation/tracking noise
             try:
-                noise_msgs = self.env["mail.message"].sudo().search([
+                all_msgs = self.env["mail.message"].sudo().search([
                     ("model", "=", "res.partner"),
                     ("res_id", "=", partner.id),
-                    "|", ("body", "ilike", "%Contact créé%"),
-                    "|", ("body", "ilike", "%Partner created%"),
-                    ("message_type", "=", "tracking"),
                 ])
-                if noise_msgs:
-                    noise_msgs.unlink()
+                for m in all_msgs:
+                    b_str = str(m.body or "")
+                    if "Vérification KYB" in b_str or "Doublon" in b_str:
+                        continue
+                    is_noise = (
+                        "Contact créé" in b_str
+                        or "Partner created" in b_str
+                        or m.message_type == "tracking"
+                        or bool(getattr(m, "tracking_value_ids", False))
+                    )
+                    if is_noise:
+                        m.unlink()
             except Exception as e_dedup:
                 _logger.warning("KYB chatter cleanup warning on partner #%s: %s", partner.id, e_dedup)
 
             statut = (partner.kyb_statut_cnrc or "ACTIF").upper()
             if "RAD" in statut or "مشطب" in statut:
                 badge_text = "RADIÉ"
-                badge_color = "#ef4444"
+                badge_color = "#dc2626"
+                card_bg = "#fef2f2"
+                card_border = "#fecaca"
+                title_color = "#991b1b"
             elif "SUSP" in statut or "معلق" in statut:
                 badge_text = "SUSPENDU"
-                badge_color = "#f59e0b"
+                badge_color = "#d97706"
+                card_bg = "#fffbeb"
+                card_border = "#fde68a"
+                title_color = "#92400e"
             elif "NON" in statut or "INTROUVABLE" in statut:
                 badge_text = "NON TROUVÉ"
                 badge_color = "#71717a"
+                card_bg = "#fafafa"
+                card_border = "#e4e4e7"
+                title_color = "#18181b"
             else:
                 badge_text = "ACTIF"
-                badge_color = "#10b981"
+                badge_color = "#16a34a"
+                card_bg = "#f0fdf4"
+                card_border = "#bbf7d0"
+                title_color = "#166534"
 
             rows = []  # Statut row removed — badge in card header already conveys ACTIF/RADIÉ/SUSPENDU
             if partner.name:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; width: 38%;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{partner.name}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; width: 38%; white-space: nowrap; vertical-align: top;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 600; color: #0f172a;">{partner.name}</td></tr>')
             if partner.kyb_nif:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_nif}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #0f172a;"><code>{partner.kyb_nif}</code></td></tr>')
             if partner.kyb_rc:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_rc}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #0f172a;"><code>{partner.kyb_rc}</code></td></tr>')
             if partner.kyb_nis:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nis}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;"><code>{partner.kyb_nis}</code></td></tr>')
             if partner.kyb_forme_juridique:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_forme_juridique}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_forme_juridique}</td></tr>')
             if partner.kyb_date_creation:
                 label_immat = _("Date d'Immatriculation")
                 d_crea_val = partner.kyb_date_creation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_creation, "strftime") else str(partner.kyb_date_creation)
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{d_crea_val}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{d_crea_val}</td></tr>')
             if partner.kyb_date_radiation:
                 d_rad_val = partner.kyb_date_radiation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_radiation, "strftime") else str(partner.kyb_date_radiation)
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #ef4444;">{d_rad_val}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 700; color: #dc2626;">{d_rad_val}</td></tr>')
             if partner.kyb_capital_social:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_capital_social}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Capital Social")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_representant_legal}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_representant_legal}</td></tr>')
             if partner.kyb_activite:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_activite}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Activité Principale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_activite}</td></tr>')
             if partner.kyb_nae_codes:
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nae_codes}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;"><code>{partner.kyb_nae_codes}</code></td></tr>')
             if partner.kyb_activites_rc:
                 acts_formatted = partner.kyb_activites_rc.replace("\n", "<br/>")
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #3f3f46;">{acts_formatted}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #334155;">{acts_formatted}</td></tr>')
             if partner.kyb_article_imposition:
                 lbl_art = _("Article d'Imposition")
-                rows.append(f'<tr><td style="padding: 2px 0; color: #71717a;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_article_imposition}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;"><code>{partner.kyb_article_imposition}</code></td></tr>')
 
             rows_html = "".join(rows)
             now_dt = fields.Datetime.now()
             now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
-                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; margin: 2px 0;">'
-                '<table style="width: 100%; border-bottom: 1px solid #e4e4e7; margin-bottom: 8px; padding-bottom: 4px;">'
-                '<tr>'
-                f'<td style="text-align: left; vertical-align: middle;"><strong style="color: #18181b; font-size: 13px; font-weight: 600;">{_("Vérification KYB")}</strong></td>'
-                f'<td style="text-align: right; vertical-align: middle;"><span style="background-color: {badge_color} !important; color: #ffffff !important; padding: 3px 10px !important; border-radius: 9999px !important; font-size: 11px !important; font-weight: 700 !important; display: inline-block !important; text-transform: uppercase !important; letter-spacing: 0.05em !important;">{badge_text}</span></td>'
-                '</tr>'
-                '</table>'
+                f'<div style="background-color: {card_bg}; border: 1px solid {card_border}; border-radius: 6px; padding: 10px 14px; margin: 4px 0; max-width: 560px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">'
+                f'<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid {card_border}; padding-bottom: 5px;">'
+                f'<span style="font-weight: 700; color: {title_color}; font-size: 13px;">{_("Vérification KYB")}</span>'
+                f'<span style="background-color: {badge_color} !important; color: #ffffff !important; padding: 2px 8px !important; border-radius: 9999px !important; font-size: 10px !important; font-weight: 700 !important; display: inline-block !important; text-transform: uppercase !important; letter-spacing: 0.04em !important;">{badge_text}</span>'
+                f'</div>'
                 f'<table style="width: 100%; font-size: 12px; border-collapse: collapse;">{rows_html}</table>'
-                f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid #e4e4e7; padding-top: 4px;">'
+                f'<div style="margin-top: 6px; font-size: 10px; color: #64748b; border-top: 1px solid {card_border}; padding-top: 4px;">'
                 f'{_("Consultation Registre Officiel")} · {now_str}'
                 f'</div>'
-                '</div>'
+                f'</div>'
             )
             # Chatter author attribution: assign message to the active session user (e.g. Administrator)
             user_partner = getattr(getattr(self.env, "user", None), "partner_id", None)
@@ -1467,25 +1618,18 @@ class ResPartner(models.Model):
 
             adresse = data.get("adresse") or data.get("adresseSiegeSocial", "")
             wilaya_raw = data.get("wilaya", "")
-            commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(wilaya_raw or adresse)
+            cp_raw = data.get("code_postal") or data.get("codePostal") or ""
+            addr_parsed = _parse_algerian_address_components(adresse, wilaya_raw, cp_raw)
+            wilaya_name = addr_parsed["wilaya_name"]
+            wilaya_code = addr_parsed["wilaya_code"]
 
-            clean_street = adresse
-            if "/" in (adresse or ""):
-                c_part, w_part, _wcode = _split_algerian_commune_wilaya(adresse)
-                if c_part and w_part:
-                    clean_street = f"Commune {c_part}, Wilaya de {w_part}"
-                elif w_part:
-                    clean_street = f"Wilaya de {w_part}"
-
-            if clean_street:
-                self.street = clean_street
-            elif wilaya_name:
-                self.street = f"Siège Social, {wilaya_name}"
-            else:
-                self.street = False
-
-            city_val = commune_name if commune_name else wilaya_name
-            self.city = city_val or False
+            self.street = addr_parsed["street"]
+            self.street2 = addr_parsed["street2"]
+            self.city = addr_parsed["city"]
+            if addr_parsed["zip"]:
+                self.zip = addr_parsed["zip"]
+            if data.get("telephone") and not self.phone:
+                self.phone = str(data.get("telephone")).strip()
 
             # Resolve Country & State
             dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
@@ -1497,6 +1641,16 @@ class ResPartner(models.Model):
                 else:
                     domain.append(("name", "ilike", wilaya_name))
                 st = self.env["res.country.state"].search(domain, limit=1)
+                if not st:
+                    try:
+                        w_code = wilaya_code or wilaya_name[:2].upper()
+                        st = self.env["res.country.state"].sudo().create({
+                            "name": wilaya_name,
+                            "code": w_code,
+                            "country_id": dz_country.id,
+                        })
+                    except Exception:
+                        st = False
                 self.state_id = st.id if st else False
             else:
                 self.state_id = False
@@ -1529,11 +1683,15 @@ class ResPartner(models.Model):
                     "kyb_nis": self.kyb_nis,
                     "is_company": self.is_company,
                     "street": self.street,
+                    "street2": self.street2,
                     "city": self.city,
+                    "zip": self.zip,
                     "country_id": self.country_id.id if self.country_id else False,
                     "state_id": self.state_id.id if self.state_id else False,
                     "kyb_last_verified": self.kyb_last_verified,
                 }
+                if self.phone:
+                    write_vals["phone"] = self.phone
                 if "company_registry" in self._fields and self.company_registry:
                     write_vals["company_registry"] = self.company_registry
                 # tracking_disable=True: suppress Odoo ORM field-diff chatter; the
@@ -1920,12 +2078,14 @@ class ResPartner(models.Model):
         dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
         dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
 
-        # Map Wilaya to res.country.state (or auto-create if missing in vanilla Odoo)
+        # Map Wilaya & Address components to res.country.state, street, street2, city, zip
         state_dict = False
-        raw_loc = data.get("wilaya") or candidate_ctx.get("wilaya") or data.get("adresse") or ""
-        commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(raw_loc)
-        if not wilaya_name:
-            wilaya_name = str(data.get("wilaya") or candidate_ctx.get("wilaya") or "").title()
+        raw_street = data.get("adresse") or data.get("adresseSiegeSocial") or ""
+        raw_wilaya = data.get("wilaya") or candidate_ctx.get("wilaya") or ""
+        raw_cp = data.get("code_postal") or data.get("codePostal") or candidate_ctx.get("code_postal") or ""
+        addr_parsed = _parse_algerian_address_components(raw_street, raw_wilaya, raw_cp)
+        wilaya_name = addr_parsed["wilaya_name"] or str(raw_wilaya).title()
+        wilaya_code = addr_parsed["wilaya_code"]
 
         if wilaya_name and dz_country:
             search_domain = [("country_id", "=", dz_country.id)]
@@ -2014,17 +2174,6 @@ class ResPartner(models.Model):
             is_pp = True
 
         nif_val = data.get("nif") or candidate_ctx.get("vat") or candidate_ctx.get("nif") or ""
-
-        raw_street = data.get("adresse") or data.get("adresseSiegeSocial") or ""
-        clean_street = raw_street
-        if "/" in (raw_street or ""):
-            c_part, w_part, _wcode = _split_algerian_commune_wilaya(raw_street)
-            if c_part and w_part:
-                clean_street = f"Commune {c_part}, Wilaya de {w_part}"
-            elif w_part:
-                clean_street = f"Wilaya de {w_part}"
-
-        city_val = commune_name if commune_name else wilaya_name
         date_rad_val = _normalize_algerian_date(data.get("date_radiation") or data.get("dateRadiation") or data.get("radiation_date"))
 
         enrich_dict = {
@@ -2040,9 +2189,13 @@ class ResPartner(models.Model):
             "kyb_activite": primary_formatted,
             "kyb_nae_codes": nae_str,
             "kyb_activites_rc": "\n".join(secondary_acts_lines) if secondary_acts_lines else False,
-            "street": clean_street,
-            "city": city_val,
+            "street": addr_parsed["street"] or "",
+            "street2": addr_parsed["street2"] or "",
+            "city": addr_parsed["city"] or "",
+            "zip": addr_parsed["zip"] or "",
         }
+        if data.get("telephone"):
+            enrich_dict["phone"] = str(data.get("telephone")).strip()
 
         if is_pm:
             enrich_dict["is_company"] = True
@@ -2091,7 +2244,7 @@ class ResPartner(models.Model):
         ALWAYS_SYNC_FIELDS = {
             "name", "vat", "kyb_nif", "kyb_rc", "kyb_nis", "kyb_article_imposition",
             "kyb_statut_cnrc", "kyb_activite",
-            "kyb_nae_codes", "kyb_activites_rc", "street", "city", "country_id", "state_id",
+            "kyb_nae_codes", "kyb_activites_rc", "street", "street2", "city", "zip", "country_id", "state_id",
             "is_company", "company_type", "kyb_forme_juridique", "kyb_capital_social",
             "kyb_representant_legal", "company_registry"
         }

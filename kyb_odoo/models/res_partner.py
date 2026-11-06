@@ -1684,8 +1684,152 @@ class ResPartner(models.Model):
             return super().autocomplete_by_name(query, query_country_id, timeout=timeout)
 
         results = []
+        for cand in raw_candidates:
+            if not isinstance(cand, dict):
+                continue
+            raison = cand.get("raison_sociale") or cand.get("name") or query
+            nif = cand.get("nif") or ""
+            rc_official = cand.get("rc_number_official") or cand.get("rcNumberOfficial") or ""
+            rc_raw = cand.get("rc_number") or cand.get("rc") or ""
 
+            # 1. Fallback Year Resolution for Official 16-Character RC (Décret 05-468: WW/00-XXXXXXXBYY)
+            fallback_year = None
+            if cand.get("date_immatriculation"):
+                m_yr = re.search(r'(\d{4})', str(cand["date_immatriculation"]))
+                if m_yr:
+                    fallback_year = m_yr.group(1)[-2:]
+            if not fallback_year and cand.get("date_creation"):
+                m_yr = re.search(r'(\d{4})', str(cand["date_creation"]))
+                if m_yr:
+                    fallback_year = m_yr.group(1)[-2:]
+            if not fallback_year and nif and len(nif) >= 4 and nif.startswith("00") and nif[2:4].isdigit():
+                fallback_year = nif[2:4]
+            if not fallback_year and rc_raw and len(rc_raw) >= 3 and rc_raw[:2].isdigit():
+                fallback_year = rc_raw[:2]
 
+            rc_formatted = format_official_rc(rc_official or rc_raw, fallback_year=fallback_year)
+            rc = rc_formatted or rc_official or rc_raw
+            c_name, w_name, _wcode = _split_algerian_commune_wilaya(cand.get("wilaya") or "")
+            wilaya_clean = w_name or cand.get("wilaya") or ""
+            city_clean = c_name if c_name else wilaya_clean
+            statut = cand.get("statut_cnrc") or cand.get("statut") or "ACTIF"
+            forme = cand.get("forme_juridique") or cand.get("forme") or ""
+
+            is_radie = bool("RAD" in str(statut).upper() or "مشطب" in str(statut))
+            is_suspendu = bool("SUSP" in str(statut).upper() or "معلق" in str(statut))
+
+            # Apply user-configured status filter
+            if filter_mode == "active_only" and is_radie:
+                continue
+
+            # Discrete legal status styling (No emoji circles, clean institutional text, discrete badge on far right)
+            if is_radie:
+                statut_label = "Radié"
+                statut_badge_style = "color: #b91c1c; background-color: #fef2f2; border: 1px solid #fecaca; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+            elif is_suspendu:
+                statut_label = "Suspendu"
+                statut_badge_style = "color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+            else:
+                statut_label = "Actif"
+                statut_badge_style = "color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
+
+            # Check if this candidate already exists in the local database (by NIF, RC, or exact name)
+            local_partner = False
+            if nif:
+                local_partner = self.env["res.partner"].sudo().search([("kyb_nif", "=", nif)], limit=1)
+            if not local_partner and rc:
+                rc_variants = list(filter(None, {rc, rc_raw, rc_official, format_official_rc(rc_raw)}))
+                domain = [("kyb_rc", "in", rc_variants)]
+                if "company_registry" in self.env["res.partner"]._fields:
+                    domain = ["|", ("kyb_rc", "in", rc_variants), ("company_registry", "in", rc_variants)]
+                local_partner = self.env["res.partner"].sudo().search(domain, limit=1)
+            if not local_partner and raison:
+                local_partner = self.env["res.partner"].sudo().search([("name", "=ilike", raison.strip())], limit=1)
+
+            local_tag = f" • ⚠️ Existant (#{local_partner.id})" if local_partner else ""
+
+            # Use most reliable identifier for duns lookup: nif > raw rc > official rc > raison
+            chosen_duns = nif or rc_raw or rc or raison
+
+            # Format spacious subtitle: RC · Wilaya · Forme (Status rendered discrete on far right)
+            sub_parts = []
+            if rc:
+                sub_parts.append(f"RC: {rc}")
+            if wilaya_clean:
+                sub_parts.append(wilaya_clean)
+            if forme:
+                sub_parts.append(forme)
+            subtitle = (" · ".join(sub_parts) + local_tag).strip(" ·")
+
+            results.append({
+                "name": raison,
+                # In Odoo partner_autocomplete_core.js, suggestion.city is copied directly to suggestion.description
+                # Formatting city as subtitle guarantees universal rich rendering across all Odoo versions (16 to 20)
+                "city": subtitle,
+                "country_id": dz_country_dict,
+                "duns": chosen_duns,
+                "vat": nif,
+                "rc_number": rc_raw,
+                "rc_official": rc,
+                "wilaya": wilaya_clean,
+                "statut_cnrc": "RADIE" if is_radie else ("SUSPENDU" if is_suspendu else "ACTIF"),
+                "forme_juridique": forme,
+                "description": subtitle,
+                "statut_badge_clean": statut_label,
+                "statut_badge_style": statut_badge_style,
+                "statut_label": statut_label,
+            })
+
+        # When showing all entities, sort ACTIF first, followed by RADIÉ
+        if filter_mode == "all":
+            results.sort(key=lambda x: 1 if ("RAD" in str(x.get("statut_cnrc", "")).upper() or "مشطب" in str(x.get("statut_cnrc", ""))) else 0)
+
+        return results
+
+    @api.model
+    def autocomplete_by_vat(self, vat, query_country_id=False, timeout=15):
+        """
+        Sovereign NIF Autocomplete Override:
+        Resolves Algerian NIF directly from KYB API (by Digidev).
+        """
+        sovereign_enabled = _get_config_bool(self.env, "kyb.sovereign_autocomplete", default=True)
+        if not sovereign_enabled:
+            if hasattr(super(), "autocomplete_by_vat"):
+                return super().autocomplete_by_vat(vat, query_country_id, timeout=timeout)
+            return []
+
+        try:
+            client = _get_kyb_client(self.env)
+            profile = client.resolve(vat)
+            data = profile.get("entity") or profile.get("data") or profile
+            if isinstance(data, dict):
+                dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
+                dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
+                rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
+                rc_raw = data.get("rc_number") or ""
+                rc = rc_official or format_official_rc(rc_raw) or rc_raw
+                c_vat, w_vat, _wcode = _split_algerian_commune_wilaya(data.get("wilaya") or data.get("adresse") or "")
+                wilaya_clean = w_vat or data.get("wilaya") or ""
+                city_clean = c_vat if c_vat else wilaya_clean
+                return [{
+                    "name": data.get("raison_sociale") or data.get("name") or vat,
+                    "city": city_clean or "Algérie",
+                    "country_id": dz_country_dict,
+                    "duns": data.get("nif") or vat,
+                    "vat": data.get("nif") or vat,
+                    "rc_number": rc_raw,
+                    "rc_official": rc_official or rc,
+                    "wilaya": wilaya_clean,
+                    "description": f"{wilaya_clean} • RC: {rc}".strip(" •"),
+                }]
+        except Exception as exc:
+            _logger.warning("KYB VAT autocomplete failed for '%s': %s", vat, exc)
+
+        if hasattr(super(), "autocomplete_by_vat"):
+            return super().autocomplete_by_vat(vat, query_country_id, timeout=timeout)
+        return []
+
+    @api.model
     def enrich_by_duns(self, duns, timeout=15):
         """
         Sovereign Entity Enrichment:

@@ -227,19 +227,54 @@ def _split_algerian_commune_wilaya(raw_str: Optional[str]) -> Tuple[str, str, st
     return (commune_clean, wilaya_clean, wilaya_code)
 
 
+def _unaccent_lower(text: str) -> str:
+    return (
+        (text or "")
+        .lower()
+        .replace("é", "e")
+        .replace("è", "e")
+        .replace("ê", "e")
+        .replace("ë", "e")
+        .replace("ï", "i")
+        .replace("î", "i")
+        .replace("â", "a")
+        .replace("à", "a")
+        .replace("ô", "o")
+        .replace("û", "u")
+    )
+
+
+def _strip_trailing_locality(street_str: str, locality: str) -> str:
+    """Strips a trailing city/commune/wilaya token from the end of a street string to avoid repetition."""
+    if not street_str or not locality:
+        return street_str
+    s = street_str.strip()
+    loc_norm = re.sub(r"[^a-z0-9]+", " ", _unaccent_lower(locality)).strip()
+    if not loc_norm:
+        return s
+    # Match trailing locality (with optional leading comma/dash/space)
+    words = s.split()
+    loc_words = loc_norm.split()
+    if len(words) > len(loc_words):
+        tail = " ".join(words[-len(loc_words):]).strip(" ,.-/()")
+        tail_norm = re.sub(r"[^a-z0-9]+", " ", _unaccent_lower(tail)).strip()
+        if tail_norm == loc_norm:
+            s = " ".join(words[:-len(loc_words)]).strip(" ,.-/")
+    return s
+
+
 def _parse_algerian_address_components(
     raw_adresse: Optional[str],
     raw_wilaya: Optional[str],
     raw_code_postal: Optional[str] = None,
 ) -> dict:
     """
-    Parses CNRC/DGI Algerian address data into clean Odoo fields:
-    street (Rue), street2 (Commune), city (Ville/Commune), zip (Code postal 5 digits),
-    wilaya_name, wilaya_code.
-    Handles:
-    - Code postal in format 'BERRIANE (47100)' or 'SETIF RP (19000)' or '16050'
-    - Inline ', Commune X, Wilaya de Y' inside adresse
-    - Slash format 'COMMUNE/WILAYA'
+    Parses CNRC/DGI Algerian address data into clean, non-redundant Odoo fields:
+    - street (Rue): Physical street / lot / cité / building only (trailing Commune/Wilaya stripped)
+    - street2 (Rue 2...): False (never duplicate Commune here; Ville already holds the Commune/City)
+    - city (Ville): Canonical Commune name (or accented Wilaya chef-lieu if Commune == Wilaya)
+    - zip (Code postal): 5-digit Algerian postal code
+    - wilaya_name, wilaya_code: Canonical Wilaya for state_id
     """
     adresse_str = (raw_adresse or "").strip()
     wilaya_str = (raw_wilaya or "").strip()
@@ -308,35 +343,40 @@ def _parse_algerian_address_components(
     if not wilaya_code and zip_code and zip_code[:2] in ALGERIAN_WILAYAS_69:
         wilaya_code = zip_code[:2]
         wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
+    elif wilaya_code and wilaya_code in ALGERIAN_WILAYAS_69:
+        wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
 
-    # Resolve final Commune
+    # Resolve final Commune (and normalize accented chef-lieu name if Commune matches Wilaya)
     final_commune = commune_name or inline_commune or cp_commune
-    if final_commune and wilaya_name and final_commune.lower() == wilaya_name.lower():
-        # If commune is identical to Wilaya chef-lieu, keep city as Wilaya chef-lieu
-        pass
+    if final_commune and wilaya_name:
+        if _unaccent_lower(final_commune) == _unaccent_lower(wilaya_name):
+            final_commune = wilaya_name
+        elif wilaya_name and _unaccent_lower(final_commune).startswith(_unaccent_lower(wilaya_name) + " "):
+            # e.g. 'Oran Sidi El Bachir' -> 'Sidi El Bachir'
+            sub_c = final_commune[len(wilaya_name):].strip(" -/,")
+            if len(sub_c) >= 3:
+                final_commune = sub_c.title()
 
-    # If clean_street is just the bare wilaya name (e.g. 'ALGER' or 'ORAN'), don't duplicate it as street if we have commune/wilaya
-    if clean_street and wilaya_name and clean_street.strip().lower() == wilaya_name.lower():
-        clean_street = f"Siège Social, {final_commune or wilaya_name}"
-    elif not clean_street:
-        if final_commune and wilaya_name and final_commune.lower() != wilaya_name.lower():
-            clean_street = f"Commune {final_commune}, Wilaya de {wilaya_name}"
-        elif wilaya_name:
-            clean_street = f"Wilaya de {wilaya_name}"
-
-    # Street2 holds Commune when distinct from street and Wilaya, or complements the address
-    street2_val = ""
+    # Strip trailing Wilaya or Commune name from the end of clean_street (e.g. '... CITÉ BOUAROUA SETIF' -> '... CITÉ BOUAROUA')
+    if wilaya_name:
+        clean_street = _strip_trailing_locality(clean_street, wilaya_name)
     if final_commune:
-        if wilaya_name and final_commune.lower() != wilaya_name.lower():
-            street2_val = f"Commune de {final_commune}"
-        elif wilaya_name:
-            street2_val = f"Commune de {final_commune}"
+        clean_street = _strip_trailing_locality(clean_street, final_commune)
+    if wilaya_name:
+        clean_street = _strip_trailing_locality(clean_street, wilaya_name)
+
+    # If clean_street is just the bare wilaya/commune name (e.g. 'ALGER' or 'ORAN'), leave street empty so it is not repeated above Ville
+    if clean_street and (
+        (wilaya_name and _unaccent_lower(clean_street) == _unaccent_lower(wilaya_name))
+        or (final_commune and _unaccent_lower(clean_street) == _unaccent_lower(final_commune))
+    ):
+        clean_street = ""
 
     city_val = final_commune or wilaya_name or ""
 
     return {
         "street": clean_street or False,
-        "street2": street2_val or False,
+        "street2": False,
         "city": city_val or False,
         "zip": zip_code or False,
         "commune_name": final_commune,

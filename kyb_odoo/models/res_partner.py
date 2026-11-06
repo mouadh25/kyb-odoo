@@ -978,90 +978,85 @@ class ResPartner(models.Model):
             if "RAD" in statut or "مشطب" in statut:
                 badge_text = "RADIÉ"
                 badge_color = "#dc2626"
-                card_bg = "#fef2f2"
-                card_border = "#fecaca"
-                title_color = "#991b1b"
             elif "SUSP" in statut or "معلق" in statut:
                 badge_text = "SUSPENDU"
                 badge_color = "#d97706"
-                card_bg = "#fffbeb"
-                card_border = "#fde68a"
-                title_color = "#92400e"
             elif "NON" in statut or "INTROUVABLE" in statut:
                 badge_text = "NON TROUVÉ"
                 badge_color = "#71717a"
-                card_bg = "#fafafa"
-                card_border = "#e4e4e7"
-                title_color = "#18181b"
             else:
                 badge_text = "ACTIF"
-                badge_color = "#16a34a"
-                card_bg = "#f0fdf4"
-                card_border = "#bbf7d0"
-                title_color = "#166534"
+                badge_color = "#10b981"
 
             rows = []  # Statut row removed — badge in card header already conveys ACTIF/RADIÉ/SUSPENDU
             if partner.name:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; width: 38%; white-space: nowrap; vertical-align: top;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 600; color: #0f172a;">{partner.name}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; width: 38%; white-space: nowrap; vertical-align: top;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{partner.name}</td></tr>')
             if partner.kyb_nif:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #0f172a;"><code>{partner.kyb_nif}</code></td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_nif}</td></tr>')
             if partner.kyb_rc:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #0f172a;"><code>{partner.kyb_rc}</code></td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_rc}</td></tr>')
             if partner.kyb_nis:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;"><code>{partner.kyb_nis}</code></td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nis}</td></tr>')
             if partner.kyb_forme_juridique:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_forme_juridique}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_forme_juridique}</td></tr>')
             if partner.kyb_date_creation:
                 label_immat = _("Date d'Immatriculation")
                 d_crea_val = partner.kyb_date_creation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_creation, "strftime") else str(partner.kyb_date_creation)
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{d_crea_val}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{d_crea_val}</td></tr>')
             if partner.kyb_date_radiation:
                 d_rad_val = partner.kyb_date_radiation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_radiation, "strftime") else str(partner.kyb_date_radiation)
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 700; color: #dc2626;">{d_rad_val}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #dc2626;">{d_rad_val}</td></tr>')
             if partner.kyb_capital_social:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Capital Social")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_capital_social}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_representant_legal}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_representant_legal}</td></tr>')
             if partner.kyb_activite:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Activité Principale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #0f172a;">{partner.kyb_activite}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_activite}</td></tr>')
             if partner.kyb_nae_codes:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;"><code>{partner.kyb_nae_codes}</code></td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nae_codes}</td></tr>')
             if partner.kyb_activites_rc:
                 acts_formatted = partner.kyb_activites_rc.replace("\n", "<br/>")
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #334155;">{acts_formatted}</td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #3f3f46;">{acts_formatted}</td></tr>')
             if partner.kyb_article_imposition:
                 lbl_art = _("Article d'Imposition")
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #64748b; white-space: nowrap; vertical-align: top;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #0f172a;"><code>{partner.kyb_article_imposition}</code></td></tr>')
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_article_imposition}</td></tr>')
 
             rows_html = "".join(rows)
             now_dt = fields.Datetime.now()
             now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
-                f'<div style="background-color: {card_bg}; border: 1px solid {card_border}; border-radius: 6px; padding: 10px 14px; margin: 4px 0; max-width: 560px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">'
-                f'<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid {card_border}; padding-bottom: 5px;">'
-                f'<span style="font-weight: 700; color: {title_color}; font-size: 13px;">{_("Vérification KYB")}</span>'
-                f'<span style="background-color: {badge_color} !important; color: #ffffff !important; padding: 2px 8px !important; border-radius: 9999px !important; font-size: 10px !important; font-weight: 700 !important; display: inline-block !important; text-transform: uppercase !important; letter-spacing: 0.04em !important;">{badge_text}</span>'
-                f'</div>'
+                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; margin: 2px 0;">'
+                '<table style="width: 100%; border-bottom: 1px solid #d4d4d8; margin-bottom: 8px; padding-bottom: 6px; border-collapse: collapse;">'
+                '<tr>'
+                f'<td style="text-align: left; vertical-align: middle; padding-right: 16px;"><strong style="color: #18181b; font-size: 13px; font-weight: 700;">{_("Vérification KYB")}</strong></td>'
+                f'<td style="text-align: right; vertical-align: middle;"><span style="background-color: {badge_color} !important; color: #ffffff !important; padding: 3px 10px !important; border-radius: 9999px !important; font-size: 10px !important; font-weight: 700 !important; display: inline-block !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; margin-left: 16px !important;">{badge_text}</span></td>'
+                '</tr>'
+                '</table>'
                 f'<table style="width: 100%; font-size: 12px; border-collapse: collapse;">{rows_html}</table>'
-                f'<div style="margin-top: 6px; font-size: 10px; color: #64748b; border-top: 1px solid {card_border}; padding-top: 4px;">'
+                f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid #d4d4d8; padding-top: 4px;">'
                 f'{_("Consultation Registre Officiel")} · {now_str}'
                 f'</div>'
-                f'</div>'
+                '</div>'
             )
             # Chatter author attribution: assign message to the active session user (e.g. Administrator)
+            # subtype_xmlid="mail.mt_note" renders Odoo's native light-green note bubble directly (zero nested card-inside-card)
             user_partner = getattr(getattr(self.env, "user", None), "partner_id", None)
             author_id = user_partner.id if user_partner else False
+            note_subtype = self.env.ref("mail.mt_note", raise_if_not_found=False)
             existing_cards = self.env["mail.message"].sudo().search([
                 ("model", "=", "res.partner"),
                 ("res_id", "=", partner.id),
                 ("body", "ilike", "%Vérification KYB%"),
             ], order="id desc")
             if existing_cards:
-                existing_cards[0].write({"body": Markup(body)})
+                upd_vals = {"body": Markup(body)}
+                if note_subtype:
+                    upd_vals["subtype_id"] = note_subtype.id
+                existing_cards[0].write(upd_vals)
                 if len(existing_cards) > 1:
                     existing_cards[1:].unlink()
             else:
-                partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_comment")
+                partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_note")
 
     def enrich_company_message_post(self, data):
         """

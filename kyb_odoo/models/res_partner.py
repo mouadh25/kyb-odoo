@@ -706,10 +706,16 @@ class ResPartner(models.Model):
             raw_nif_in = (vals.get("kyb_nif") or vals.get("vat") or "").strip()
             raw_nis_in = (vals.get("kyb_nis") or "").strip()
 
-            # Preserve the unformatted raw RC/NIF/NIS for post-create live resolution if record is not yet verified
+            # Preserve the unformatted raw RC/NIF/NIS for post-create live resolution if record is not yet completely verified
+            has_complete_governance = bool(
+                vals.get("kyb_nif") and (vals.get("kyb_capital_social") or vals.get("kyb_representant_legal"))
+            )
             is_already_verified = bool(
-                vals.get("kyb_last_verified")
-                or (vals.get("kyb_statut_cnrc") in ("ACTIF", "RADIE", "SUSPENDU") and raw_name and raw_name not in (raw_rc_in, raw_nif_in, raw_nis_in))
+                has_complete_governance
+                and (
+                    vals.get("kyb_last_verified")
+                    or (vals.get("kyb_statut_cnrc") in ("ACTIF", "RADIE", "SUSPENDU") and raw_name and raw_name not in (raw_rc_in, raw_nif_in, raw_nis_in))
+                )
             )
             if not is_already_verified and (raw_nif_in or raw_rc_in or raw_nis_in):
                 raw_queries_by_idx[idx] = raw_nif_in or raw_rc_in or raw_nis_in
@@ -813,18 +819,17 @@ class ResPartner(models.Model):
         for partner in self:
             if not hasattr(partner, "message_post"):
                 continue
-            # Strict Chatter Deduplication Guard: Keep a single fresh institutional card with complete details
-            # Purges redundant Contact créé, tracking diffs, and old cards so exactly one clean KYB record remains
+            # Strict Chatter Deduplication Guard: Remove generic creation/tracking noise
             try:
-                old_cards = self.env["mail.message"].sudo().search([
+                noise_msgs = self.env["mail.message"].sudo().search([
                     ("model", "=", "res.partner"),
                     ("res_id", "=", partner.id),
-                    "|", ("body", "ilike", "%Vérification KYB%"),
                     "|", ("body", "ilike", "%Contact créé%"),
+                    "|", ("body", "ilike", "%Partner created%"),
                     ("message_type", "=", "tracking"),
                 ])
-                if old_cards:
-                    old_cards.unlink()
+                if noise_msgs:
+                    noise_msgs.unlink()
             except Exception as e_dedup:
                 _logger.warning("KYB chatter cleanup warning on partner #%s: %s", partner.id, e_dedup)
 
@@ -895,7 +900,17 @@ class ResPartner(models.Model):
             # Chatter author attribution: assign message to the active session user (e.g. Administrator)
             user_partner = getattr(getattr(self.env, "user", None), "partner_id", None)
             author_id = user_partner.id if user_partner else False
-            partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_comment")
+            existing_cards = self.env["mail.message"].sudo().search([
+                ("model", "=", "res.partner"),
+                ("res_id", "=", partner.id),
+                ("body", "ilike", "%Vérification KYB%"),
+            ], order="id desc")
+            if existing_cards:
+                existing_cards[0].write({"body": Markup(body)})
+                if len(existing_cards) > 1:
+                    existing_cards[1:].unlink()
+            else:
+                partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_comment")
 
     def enrich_company_message_post(self, data):
         """
@@ -1021,11 +1036,13 @@ class ResPartner(models.Model):
     def action_verify_kyb(self):
         """Action button to trigger manual verification from partner form."""
         self.ensure_one()
-        # If record was just auto-verified during create() within the last 10 seconds, avoid redundant billing
+        # If record was just auto-verified during create() within the last 10 seconds and is already complete, avoid redundant billing
         if (
             self.kyb_last_verified
             and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU")
             and self.name
+            and self.kyb_nif
+            and (self.kyb_capital_social or self.kyb_representant_legal)
             and (fields.Datetime.now() - self.kyb_last_verified).total_seconds() < 10
         ):
             return {
@@ -1039,6 +1056,7 @@ class ResPartner(models.Model):
                     },
                     "sticky": False,
                     "type": "success",
+                    "next": {"type": "ir.actions.act_window_close"},
                 },
             }
         query = (
@@ -1064,6 +1082,7 @@ class ResPartner(models.Model):
                     "message": warn.get("message", _("Aucune entité trouvée.")),
                     "sticky": False,
                     "type": "warning",
+                    "next": {"type": "ir.actions.act_window_close"},
                 },
             }
         return {
@@ -1077,6 +1096,7 @@ class ResPartner(models.Model):
                 },
                 "sticky": False,
                 "type": "success",
+                "next": {"type": "ir.actions.act_window_close"},
             },
         }
 
@@ -1256,8 +1276,45 @@ class ResPartner(models.Model):
             if not isinstance(data, dict):
                 data = profile
 
-            # Grille Tarifaire Invariant: 1 Credit per verification.
-            # profile resolved via client.resolve() is already complete. No redundant Phase 2 billing.
+            # Deep Enrichment Fallback: if resolve returned a partial skeleton without NIF or governance (capital/gerant), trigger live enrich
+            if not data.get("nif") or not (data.get("capital_social") or data.get("representant_legal")):
+                try:
+                    rc_cand = (
+                        data.get("rc_number")
+                        or self.kyb_rc
+                        or (self.company_registry if "company_registry" in self._fields else "")
+                        or (query if any(c.isalpha() for c in query) and any(c.isdigit() for c in query) else "")
+                    )
+                    nif_cand = (
+                        data.get("nif")
+                        or self.kyb_nif
+                        or self.vat
+                        or (query if query.isdigit() and len(query) in (15, 20) else "")
+                    )
+                    nis_cand = (
+                        data.get("nis")
+                        or self.kyb_nis
+                        or (query if query.isdigit() and len(query) == 15 else "")
+                    )
+                    name_cand = (
+                        data.get("raison_sociale")
+                        or self.name
+                        or (query if not any(c.isdigit() for c in query) else "")
+                    )
+                    if rc_cand or nif_cand or nis_cand or name_cand:
+                        enrich_resp = client.enrich(
+                            rc_number=rc_cand,
+                            raison_sociale=name_cand,
+                            nif=nif_cand,
+                            nis=nis_cand,
+                            force_live=True,
+                        )
+                        if isinstance(enrich_resp, dict) and isinstance(enrich_resp.get("entity"), dict):
+                            for k, v in enrich_resp["entity"].items():
+                                if v is not None and v != "":
+                                    data[k] = v
+                except Exception as e_deep:
+                    _logger.warning("KYB deep enrich fallback in _do_kyb_resolve failed for %s: %s", query, e_deep)
 
             # ── Strict Algerian CNRC Classification: Personne Morale (PM) vs Personne Physique (PP) ──
             rc_val = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "")
@@ -1627,152 +1684,8 @@ class ResPartner(models.Model):
             return super().autocomplete_by_name(query, query_country_id, timeout=timeout)
 
         results = []
-        for cand in raw_candidates:
-            if not isinstance(cand, dict):
-                continue
-            raison = cand.get("raison_sociale") or cand.get("name") or query
-            nif = cand.get("nif") or ""
-            rc_official = cand.get("rc_number_official") or cand.get("rcNumberOfficial") or ""
-            rc_raw = cand.get("rc_number") or cand.get("rc") or ""
 
-            # 1. Fallback Year Resolution for Official 16-Character RC (Décret 05-468: WW/00-XXXXXXXBYY)
-            fallback_year = None
-            if cand.get("date_immatriculation"):
-                m_yr = re.search(r'(\d{4})', str(cand["date_immatriculation"]))
-                if m_yr:
-                    fallback_year = m_yr.group(1)[-2:]
-            if not fallback_year and cand.get("date_creation"):
-                m_yr = re.search(r'(\d{4})', str(cand["date_creation"]))
-                if m_yr:
-                    fallback_year = m_yr.group(1)[-2:]
-            if not fallback_year and nif and len(nif) >= 4 and nif.startswith("00") and nif[2:4].isdigit():
-                fallback_year = nif[2:4]
-            if not fallback_year and rc_raw and len(rc_raw) >= 3 and rc_raw[:2].isdigit():
-                fallback_year = rc_raw[:2]
 
-            rc_formatted = format_official_rc(rc_official or rc_raw, fallback_year=fallback_year)
-            rc = rc_formatted or rc_official or rc_raw
-            c_name, w_name, _wcode = _split_algerian_commune_wilaya(cand.get("wilaya") or "")
-            wilaya_clean = w_name or cand.get("wilaya") or ""
-            city_clean = c_name if c_name else wilaya_clean
-            statut = cand.get("statut_cnrc") or cand.get("statut") or "ACTIF"
-            forme = cand.get("forme_juridique") or cand.get("forme") or ""
-
-            is_radie = bool("RAD" in str(statut).upper() or "مشطب" in str(statut))
-            is_suspendu = bool("SUSP" in str(statut).upper() or "معلق" in str(statut))
-
-            # Apply user-configured status filter
-            if filter_mode == "active_only" and is_radie:
-                continue
-
-            # Discrete legal status styling (No emoji circles, clean institutional text, discrete badge on far right)
-            if is_radie:
-                statut_label = "Radié"
-                statut_badge_style = "color: #b91c1c; background-color: #fef2f2; border: 1px solid #fecaca; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
-            elif is_suspendu:
-                statut_label = "Suspendu"
-                statut_badge_style = "color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
-            else:
-                statut_label = "Actif"
-                statut_badge_style = "color: #15803d; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; display: inline-block; white-space: nowrap;"
-
-            # Check if this candidate already exists in the local database (by NIF, RC, or exact name)
-            local_partner = False
-            if nif:
-                local_partner = self.env["res.partner"].sudo().search([("kyb_nif", "=", nif)], limit=1)
-            if not local_partner and rc:
-                rc_variants = list(filter(None, {rc, rc_raw, rc_official, format_official_rc(rc_raw)}))
-                domain = [("kyb_rc", "in", rc_variants)]
-                if "company_registry" in self.env["res.partner"]._fields:
-                    domain = ["|", ("kyb_rc", "in", rc_variants), ("company_registry", "in", rc_variants)]
-                local_partner = self.env["res.partner"].sudo().search(domain, limit=1)
-            if not local_partner and raison:
-                local_partner = self.env["res.partner"].sudo().search([("name", "=ilike", raison.strip())], limit=1)
-
-            local_tag = f" • ⚠️ Existant (#{local_partner.id})" if local_partner else ""
-
-            # Use most reliable identifier for duns lookup: nif > raw rc > official rc > raison
-            chosen_duns = nif or rc_raw or rc or raison
-
-            # Format spacious subtitle: RC · Wilaya · Forme (Status rendered discrete on far right)
-            sub_parts = []
-            if rc:
-                sub_parts.append(f"RC: {rc}")
-            if wilaya_clean:
-                sub_parts.append(wilaya_clean)
-            if forme:
-                sub_parts.append(forme)
-            subtitle = (" · ".join(sub_parts) + local_tag).strip(" ·")
-
-            results.append({
-                "name": raison,
-                # In Odoo partner_autocomplete_core.js, suggestion.city is copied directly to suggestion.description
-                # Formatting city as subtitle guarantees universal rich rendering across all Odoo versions (16 to 20)
-                "city": subtitle,
-                "country_id": dz_country_dict,
-                "duns": chosen_duns,
-                "vat": nif,
-                "rc_number": rc_raw,
-                "rc_official": rc,
-                "wilaya": wilaya_clean,
-                "statut_cnrc": "RADIE" if is_radie else ("SUSPENDU" if is_suspendu else "ACTIF"),
-                "forme_juridique": forme,
-                "description": subtitle,
-                "statut_badge_clean": statut_label,
-                "statut_badge_style": statut_badge_style,
-                "statut_label": statut_label,
-            })
-
-        # When showing all entities, sort ACTIF first, followed by RADIÉ
-        if filter_mode == "all":
-            results.sort(key=lambda x: 1 if ("RAD" in str(x.get("statut_cnrc", "")).upper() or "مشطب" in str(x.get("statut_cnrc", ""))) else 0)
-
-        return results
-
-    @api.model
-    def autocomplete_by_vat(self, vat, query_country_id=False, timeout=15):
-        """
-        Sovereign NIF Autocomplete Override:
-        Resolves Algerian NIF directly from KYB API (by Digidev).
-        """
-        sovereign_enabled = _get_config_bool(self.env, "kyb.sovereign_autocomplete", default=True)
-        if not sovereign_enabled:
-            if hasattr(super(), "autocomplete_by_vat"):
-                return super().autocomplete_by_vat(vat, query_country_id, timeout=timeout)
-            return []
-
-        try:
-            client = _get_kyb_client(self.env)
-            profile = client.resolve(vat)
-            data = profile.get("entity") or profile.get("data") or profile
-            if isinstance(data, dict):
-                dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
-                dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
-                rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
-                rc_raw = data.get("rc_number") or ""
-                rc = rc_official or format_official_rc(rc_raw) or rc_raw
-                c_vat, w_vat, _wcode = _split_algerian_commune_wilaya(data.get("wilaya") or data.get("adresse") or "")
-                wilaya_clean = w_vat or data.get("wilaya") or ""
-                city_clean = c_vat if c_vat else wilaya_clean
-                return [{
-                    "name": data.get("raison_sociale") or data.get("name") or vat,
-                    "city": city_clean or "Algérie",
-                    "country_id": dz_country_dict,
-                    "duns": data.get("nif") or vat,
-                    "vat": data.get("nif") or vat,
-                    "rc_number": rc_raw,
-                    "rc_official": rc_official or rc,
-                    "wilaya": wilaya_clean,
-                    "description": f"{wilaya_clean} • RC: {rc}".strip(" •"),
-                }]
-        except Exception as exc:
-            _logger.warning("KYB VAT autocomplete failed for '%s': %s", vat, exc)
-
-        if hasattr(super(), "autocomplete_by_vat"):
-            return super().autocomplete_by_vat(vat, query_country_id, timeout=timeout)
-        return []
-
-    @api.model
     def enrich_by_duns(self, duns, timeout=15):
         """
         Sovereign Entity Enrichment:

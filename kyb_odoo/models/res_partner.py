@@ -49,7 +49,7 @@ def parse_algerian_rc(raw: Optional[str]) -> Optional[dict]:
     else:
         m = COMPRESSED_RC_REGEX.match(clean)
         if m:
-            wilaya, category, register_number = m.group(1).zfill(2), m.group(2).upper(), m.group(3)
+            wilaya, category, register_number, year = m.group(1).zfill(2), m.group(2).upper(), m.group(3), m.group(1).zfill(2)
         else:
             m = SPACED_RC_REGEX_1.match(clean)
             if m:
@@ -87,11 +87,26 @@ def parse_algerian_rc(raw: Optional[str]) -> Optional[dict]:
         'official': f'{wilaya}/00-{padded_reg}{category}{year}' if year else f'{wilaya}/00-{padded_reg}{category}'
     }
 
-def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) -> Optional[str]:
+def format_official_rc(
+    raw: Optional[str],
+    fallback_year: Optional[str] = None,
+    fallback_wilaya: Optional[str] = None,
+) -> Optional[str]:
     """Format any Algerian RC into official Décret 05-468 format: WW/00-XXXXXXX[A|B|C|D]YY."""
-    p = parse_algerian_rc(raw)
-    if not p:
+    if not raw or not isinstance(raw, str):
         return None
+    clean = raw.strip()
+    # INVARIANT (certified 2026-11-06): the RC prefix is copied VERBATIM from the registry.
+    # It must NEVER be rewritten from the NIF/address Wilaya. CNRC e-registrations use the
+    # registration year as prefix (e.g. 24/00-1052733B24 for a company seated in Alger),
+    # so any Wilaya-based "correction" fabricates an RC that does not exist.
+    # `fallback_wilaya` is accepted for signature compatibility and intentionally ignored.
+    if re.match(r'^(0[0-9]|[1-6]\d|8[0-9]|9[0-9]|[0-9])/00-(\d{7})([ABCDabcd])(\d{2})$', clean):
+        return clean
+
+    p = parse_algerian_rc(clean)
+    if not p:
+        return clean
     y = ''
     if fallback_year:
         s_yr = str(fallback_year).strip()
@@ -100,11 +115,80 @@ def format_official_rc(raw: Optional[str], fallback_year: Optional[str] = None) 
         m = m4 or m2 or re.search(r'(\d{2})', s_yr)
         if m:
             y = m.group(1)[-2:]
+    if not y and p.get('year'):
+        y = str(p['year']).zfill(2)
+    if not y:
+        m_prefix = re.match(r'^(\d{2})[ABCDabcd]', clean)
+        if m_prefix:
+            y = m_prefix.group(1)
+
+    final_w = p['wilaya']
     if y:
-        return f"{p['wilaya']}/00-{p['register_number']}{p['category']}{y}"
-    if p.get('year'):
-        return p['official']
-    return p['official']
+        return f"{final_w}/00-{p['register_number']}{p['category']}{y}"
+    return f"{final_w}/00-{p['register_number']}{p['category']}"
+
+def _clean_algerian_representant(raw: Optional[str]) -> Optional[str]:
+    """
+    Cleans representative / gérant string extracted from BOAL legal announcements or CNRC:
+    - Strips leading action verbs: 'Désigner Mme X...', 'Nomination de M. Y...', 'Gérant: Z...'
+    - Strips trailing roles and conjunctions: '...en qualité de gérant et', '... et', '... ou', trailing commas.
+    """
+    if not raw or not isinstance(raw, str):
+        return False
+    s = raw.strip()
+    if not s or s.lower() in ("none", "null", "false", "-", "n/a"):
+        return False
+
+    # Strip leading BOAL publication verbs/markers
+    s = re.sub(
+        r"^(?:d[eé]signer|nommer|nomination\s+(?:de\s+|d['’])?|g[eé]rance\s+(?:par\s+|assur[eé]e\s+par\s+)?|renouvellement\s+(?:de\s+)?|confier\s+la\s+g[eé]rance\s+[aà]\s+|g[eé]rant\s*:?|repr[eé]sentant\s*:?)\s*",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+
+    # Strip trailing role annotations (e.g. 'en qualité de gérant...', 'pour une durée...')
+    s = re.sub(
+        r"\s+(?:en\s+qualit[eé]\s+(?:de\s+|d['’]).*|en\s+tant\s+que.*|comme\s+g[eé]rant.*|pour\s+une\s+dur[eé]e.*|avec\s+(?:tous\s+)?les\s+pouvoirs.*)$",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+
+    # Strip trailing conjunctions, commas, semicolons, dashes
+    s = re.sub(r"\s+(?:et|ou|,|;|pour|avec|-|\/)\s*$", "", s, flags=re.IGNORECASE)
+    s = s.strip(" ,.-;/")
+    if len(s) < 2:
+        return False
+    return s
+
+def _deduce_algerian_creation_date(nif: Optional[str] = None, rc: Optional[str] = None) -> Optional[str]:
+    """
+    Deterministically deduces the creation/immatriculation date ('YYYY-01-01')
+    from Algerian corporate NIF (00YYWWXXXXXXXCC -> 20YY-01-01) or official RC.
+    Guarantees 'Date d'Immatriculation' is never empty when year is known from identifiers.
+    """
+    if nif:
+        clean_nif = re.sub(r"[^\d]", "", str(nif))
+        if len(clean_nif) in (15, 20) and clean_nif.startswith("00"):
+            yy_str = clean_nif[2:4]
+            if yy_str.isdigit():
+                yy = int(yy_str)
+                full_y = 2000 + yy if yy <= 50 else 1900 + yy
+                return f"{full_y}-01-01"
+    if rc:
+        clean_rc = str(rc).strip()
+        m_official = re.search(r"[ABCDabcd](\d{2})$", clean_rc)
+        if m_official:
+            yy = int(m_official.group(1))
+            full_y = 2000 + yy if yy <= 50 else 1900 + yy
+            return f"{full_y}-01-01"
+        m_comp = re.match(r"^(\d{2})[ABCDabcd]", clean_rc)
+        if m_comp:
+            yy = int(m_comp.group(1))
+            full_y = 2000 + yy if yy <= 50 else 1900 + yy
+            return f"{full_y}-01-01"
+    return False
 
 def _normalize_algerian_date(val: Optional[any]) -> Optional[str]:
     """
@@ -263,18 +347,46 @@ def _strip_trailing_locality(street_str: str, locality: str) -> str:
     return s
 
 
+ALGERIAN_COMMUNE_POSTAL_CODES = {
+    "bab ezzouar": "16311", "dar el beida": "16100", "rouiba": "16039", "reghaia": "16043",
+    "kouba": "16050", "cheraga": "16053", "hydra": "16035", "alger": "16000", "alger centre": "16000",
+    "sidi m'hamed": "16014", "bir mourad rais": "16005", "birkhadem": "16029", "dely ibrahim": "16047",
+    "ben aknoun": "16028", "el biar": "16030", "bouzareah": "16032", "draria": "16055",
+    "ouled fayet": "16094", "saoula": "16093", "staoueli": "16062", "zeralda": "16063",
+    "birtouta": "16086", "baraki": "16210", "el harrach": "16200", "hussein dey": "16040",
+    "constantine": "25000", "sidi mabrouk": "25003", "ibn ziad": "25130", "el khroub": "25100",
+    "ain smara": "25140", "hamma bouziane": "25230", "didouche mourad": "25210",
+    "setif": "19000", "el eulma": "19600", "oran": "31000", "es senia": "31100", "bir el djir": "31130",
+    "batna": "05000", "kechida": "05005", "barika": "05001", "blida": "09000", "boufarik": "09400",
+    "ouled yaich": "09100", "guelma": "24000", "annaba": "23000", "el bouni": "23200",
+    "tlemcen": "13000", "bejaia": "06000", "akbou": "06200", "tizi ouzou": "15000",
+    "boumerdes": "35000", "khemis el khechna": "35310", "tipaza": "42000", "kolea": "42400",
+    "bba": "34000", "bordj bou arreridj": "34000", "mostaganem": "27000", "chlef": "02000",
+    "biskra": "07000", "skikda": "21000", "jijel": "18000", "medea": "26000",
+}
+
+_NORM_COMMUNE_TO_ZIP = {re.sub(r"[^a-z0-9]", "", k.lower()): v for k, v in ALGERIAN_COMMUNE_POSTAL_CODES.items()}
+
+
 def _parse_algerian_address_components(
     raw_adresse: Optional[str],
     raw_wilaya: Optional[str],
     raw_code_postal: Optional[str] = None,
+    raw_nif: Optional[str] = None,
 ) -> dict:
     """
+    [ESTABLISHED INVARIANT - DO NOT MODIFY OR REINVENT]
     Parses CNRC/DGI Algerian address data into clean, non-redundant Odoo fields:
-    - street (Rue): Physical street / lot / cité / building only (trailing Commune/Wilaya stripped)
-    - street2 (Rue 2...): False (never duplicate Commune here; Ville already holds the Commune/City)
-    - city (Ville): Canonical Commune name (or accented Wilaya chef-lieu if Commune == Wilaya)
-    - zip (Code postal): 5-digit Algerian postal code
-    - wilaya_name, wilaya_code: Canonical Wilaya for state_id
+    1. street (Rue): Physical street / lot / cité / building ONLY.
+       - Strips inline ', Commune X, Wilaya de Y' clauses.
+       - Strips trailing Commune or Wilaya token from the end (e.g. '... CITÉ BOUAROUA SETIF' -> '... CITÉ BOUAROUA').
+       - If raw_adresse is only the bare Wilaya/Commune name, sets street = False to prevent duplication.
+    2. street2 (Rue 2...): ALWAYS False. NEVER put 'Commune de ...' in street2 (Commune is Ville/city, not a 2nd street line).
+    3. city (Ville): Single canonical Commune name (or accented Wilaya chef-lieu when Commune == Wilaya).
+       STRICTLY ISOLATED from the Wilaya — NEVER joins Commune to Wilaya.
+    4. zip (Code postal): 5-digit Algerian postal code. If missing from CNRC, derives from commune or fallback Wilaya code (WW000).
+    5. wilaya_name, wilaya_code: Pure canonical Wilaya name and 2-digit code for state_id (res.country.state).
+       NEVER contains a slash '/' or a commune prefix (e.g. 'Constantine', NEVER 'Ibn Ziad/Constantine').
     """
     adresse_str = (raw_adresse or "").strip()
     wilaya_str = (raw_wilaya or "").strip()
@@ -332,13 +444,20 @@ def _parse_algerian_address_components(
                 inline_wilaya = w_sl
             clean_street = ""
 
-    # Resolve final Wilaya
+    # Resolve final Wilaya (STRICT INVARIANT: must NEVER contain slash or commune join)
     if not wilaya_code and inline_wilaya:
         _, w_res, wc_res = _split_algerian_commune_wilaya(inline_wilaya)
         if wc_res:
             wilaya_name, wilaya_code = w_res, wc_res
         elif not wilaya_name:
             wilaya_name = inline_wilaya
+
+    if wilaya_name and "/" in wilaya_name:
+        _, w_pure, wc_pure = _split_algerian_commune_wilaya(wilaya_name)
+        if w_pure:
+            wilaya_name = w_pure
+            if wc_pure:
+                wilaya_code = wc_pure
 
     if not wilaya_code and zip_code and zip_code[:2] in ALGERIAN_WILAYAS_69:
         wilaya_code = zip_code[:2]
@@ -352,12 +471,11 @@ def _parse_algerian_address_components(
         if _unaccent_lower(final_commune) == _unaccent_lower(wilaya_name):
             final_commune = wilaya_name
         elif wilaya_name and _unaccent_lower(final_commune).startswith(_unaccent_lower(wilaya_name) + " "):
-            # e.g. 'Oran Sidi El Bachir' -> 'Sidi El Bachir'
             sub_c = final_commune[len(wilaya_name):].strip(" -/,")
             if len(sub_c) >= 3:
                 final_commune = sub_c.title()
 
-    # Strip trailing Wilaya or Commune name from the end of clean_street (e.g. '... CITÉ BOUAROUA SETIF' -> '... CITÉ BOUAROUA')
+    # Strip trailing Wilaya or Commune name from the end of clean_street
     if wilaya_name:
         clean_street = _strip_trailing_locality(clean_street, wilaya_name)
     if final_commune:
@@ -365,7 +483,7 @@ def _parse_algerian_address_components(
     if wilaya_name:
         clean_street = _strip_trailing_locality(clean_street, wilaya_name)
 
-    # If clean_street is just the bare wilaya/commune name (e.g. 'ALGER' or 'ORAN'), leave street empty so it is not repeated above Ville
+    # If clean_street is just the bare wilaya/commune name, leave street empty
     if clean_street and (
         (wilaya_name and _unaccent_lower(clean_street) == _unaccent_lower(wilaya_name))
         or (final_commune and _unaccent_lower(clean_street) == _unaccent_lower(final_commune))
@@ -373,6 +491,44 @@ def _parse_algerian_address_components(
         clean_street = ""
 
     city_val = final_commune or wilaya_name or ""
+
+    # 4. Fallback 5-digit Postal Code Resolution (GUARANTEES NON-EMPTY POSTAL CODE)
+    if not zip_code:
+        if final_commune:
+            fc_norm = re.sub(r"[^a-z0-9]", "", _unaccent_lower(final_commune))
+            if fc_norm in _NORM_COMMUNE_TO_ZIP:
+                zip_code = _NORM_COMMUNE_TO_ZIP[fc_norm]
+        if not zip_code and adresse_str:
+            adr_norm = re.sub(r"[^a-z0-9]", "", _unaccent_lower(adresse_str))
+            for c_k, c_zip in _NORM_COMMUNE_TO_ZIP.items():
+                if c_k in adr_norm:
+                    zip_code = c_zip
+                    break
+        if not zip_code and wilaya_code:
+            w_int = int(wilaya_code) if str(wilaya_code).isdigit() else 0
+            if 1 <= w_int <= 58:
+                zip_code = f"{w_int:02d}000"
+
+    # Reconcile Geographical Wilaya with Postal Code & NIF (NEVER MIX COMMUNE & WRONG WILAYA)
+    # The first 2 digits of an Algerian 5-digit postal code ALWAYS identify the official Wilaya.
+    # If zip_code was deduced from the specific commune (e.g. Bab Ezzouar -> 16311),
+    # override an erroneous registry Wilaya (e.g. Guelma 24) to keep address geographically pure.
+    if zip_code and len(zip_code) == 5 and zip_code[:2] in ALGERIAN_WILAYAS_69:
+        zip_wilaya_code = zip_code[:2]
+        if wilaya_code != zip_wilaya_code:
+            if final_commune:
+                fc_norm = re.sub(r"[^a-z0-9]", "", _unaccent_lower(final_commune))
+                if fc_norm in _NORM_COMMUNE_TO_ZIP:
+                    wilaya_code = zip_wilaya_code
+                    wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
+    if raw_nif:
+        clean_n = re.sub(r"[^\d]", "", str(raw_nif))
+        if len(clean_n) in (15, 20) and clean_n.startswith("00"):
+            nif_w = clean_n[4:6]
+            if nif_w in ALGERIAN_WILAYAS_69 and wilaya_code != nif_w:
+                if (zip_code and zip_code[:2] == nif_w) or not zip_code:
+                    wilaya_code = nif_w
+                    wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
 
     return {
         "street": clean_street or False,
@@ -985,10 +1141,16 @@ class ResPartner(models.Model):
 
     def _post_kyb_audit_log(self):
         """
-        Posts an institutional KYB audit card to the record chatter.
-        Guarantees that legal and fiscal evidence (NIF, RC, NIS, Forme, Capital, Gérant, Activité)
-        is permanently recorded in the chatter trail upon verification or creation,
-        even when standard Odoo tracking only logs 'Contact créé'.
+        [ESTABLISHED INVARIANT - DO NOT MODIFY OR REINVENT]
+        Posts the single institutional KYB audit card to the record chatter:
+        1. NEVER wrap the body in a styled inner <div> card (no background-color/border box inside the message).
+           Always post with subtype_xmlid="mail.mt_note" so Odoo's native light-green note bubble is the sole card.
+        2. NEVER use <code> tags for NIF, RC, NIS, NAE, or Article d'Imposition (Bootstrap renders <code> in red/crimson).
+           Use plain <td style="font-family: monospace; color: #18181b;">. Red (#dc2626) is strictly for RADIÉ and Date de Radiation.
+        3. ALWAYS render the header as a 2-column 100%-width <table> (left: 'Vérification KYB' with padding-right: 16px;
+           right: status pill with text-align: right and margin-left: 16px) because Odoo's html_sanitize strips flexbox
+           justify-content, which otherwise causes the ACTIF badge to collide with the title.
+        4. Update existing 'Vérification KYB' message in-place and purge any 'Contact créé' or field-tracking diff noise.
         """
         for partner in self:
             if not hasattr(partner, "message_post"):
@@ -1018,15 +1180,27 @@ class ResPartner(models.Model):
             if "RAD" in statut or "مشطب" in statut:
                 badge_text = "RADIÉ"
                 badge_color = "#dc2626"
+                card_bg = "#fef2f2"
+                card_border = "#fecaca"
+                div_border = "#fee2e2"
             elif "SUSP" in statut or "معلق" in statut:
                 badge_text = "SUSPENDU"
                 badge_color = "#d97706"
+                card_bg = "#fffbeb"
+                card_border = "#fde68a"
+                div_border = "#fef3c7"
             elif "NON" in statut or "INTROUVABLE" in statut:
                 badge_text = "NON TROUVÉ"
                 badge_color = "#71717a"
+                card_bg = "#f4f4f5"
+                card_border = "#e4e4e7"
+                div_border = "#e4e4e7"
             else:
                 badge_text = "ACTIF"
                 badge_color = "#10b981"
+                card_bg = "#f0fdf4"
+                card_border = "#bbf7d0"
+                div_border = "#dcfce7"
 
             rows = []  # Statut row removed — badge in card header already conveys ACTIF/RADIÉ/SUSPENDU
             if partner.name:
@@ -1043,13 +1217,21 @@ class ResPartner(models.Model):
                 label_immat = _("Date d'Immatriculation")
                 d_crea_val = partner.kyb_date_creation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_creation, "strftime") else str(partner.kyb_date_creation)
                 rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{d_crea_val}</td></tr>')
+            else:
+                # Exact date not published by the registry: show the year encoded in the NIF/RC, labelled as such.
+                deduced = _deduce_algerian_creation_date(nif=partner.kyb_nif, rc=partner.kyb_rc)
+                if deduced:
+                    label_immat = _("Date d'Immatriculation")
+                    yr_txt = _("Année %s (déduite du NIF — date exacte non publiée)") % deduced[:4]
+                    rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #52525b;">{yr_txt}</td></tr>')
             if partner.kyb_date_radiation:
                 d_rad_val = partner.kyb_date_radiation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_radiation, "strftime") else str(partner.kyb_date_radiation)
                 rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #dc2626;">{d_rad_val}</td></tr>')
             if partner.kyb_capital_social:
                 rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_capital_social}</td></tr>')
             if partner.kyb_representant_legal:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_representant_legal}</td></tr>')
+                clean_rep = _clean_algerian_representant(partner.kyb_representant_legal) or partner.kyb_representant_legal
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{clean_rep}</td></tr>')
             if partner.kyb_activite:
                 rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_activite}</td></tr>')
             if partner.kyb_nae_codes:
@@ -1065,15 +1247,15 @@ class ResPartner(models.Model):
             now_dt = fields.Datetime.now()
             now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
-                '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; margin: 2px 0;">'
-                '<table style="width: 100%; border-bottom: 1px solid #d4d4d8; margin-bottom: 8px; padding-bottom: 6px; border-collapse: collapse;">'
+                f'<div style="background-color: {card_bg} !important; border: 1px solid {card_border} !important; border-radius: 8px !important; padding: 12px 14px !important; margin: 4px 0 !important; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">'
+                f'<table style="width: 100%; border-bottom: 1px solid {div_border} !important; margin-bottom: 8px; padding-bottom: 6px; border-collapse: collapse;">'
                 '<tr>'
                 f'<td style="text-align: left; vertical-align: middle; padding-right: 16px;"><strong style="color: #18181b; font-size: 13px; font-weight: 700;">{_("Vérification KYB")}</strong></td>'
                 f'<td style="text-align: right; vertical-align: middle;"><span style="background-color: {badge_color} !important; color: #ffffff !important; padding: 3px 10px !important; border-radius: 9999px !important; font-size: 10px !important; font-weight: 700 !important; display: inline-block !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; margin-left: 16px !important;">{badge_text}</span></td>'
                 '</tr>'
                 '</table>'
                 f'<table style="width: 100%; font-size: 12px; border-collapse: collapse;">{rows_html}</table>'
-                f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid #d4d4d8; padding-top: 4px;">'
+                f'<div style="margin-top: 8px; font-size: 10px; color: #71717a; border-top: 1px solid {div_border} !important; padding-top: 4px;">'
                 f'{_("Consultation Registre Officiel")} · {now_str}'
                 f'</div>'
                 '</div>'
@@ -1097,6 +1279,7 @@ class ResPartner(models.Model):
                     existing_cards[1:].unlink()
             else:
                 partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_note")
+        return True
 
     def enrich_company_message_post(self, data):
         """
@@ -1218,6 +1401,7 @@ class ResPartner(models.Model):
                 partner.with_context(tracking_disable=True).write(vals)
 
             partner._post_kyb_audit_log()
+        return True
 
     def action_verify_kyb(self):
         """Action button to trigger manual verification from partner form."""
@@ -1553,10 +1737,11 @@ class ResPartner(models.Model):
             # - For PM (Personne Morale): Set to appointed corporate manager (Gérant / DG) from CNRC.
             # - For PP (Personne Physique): Set to titular individual owner / exploitant (Commerçant Titulaire).
             rep = data.get("representant_legal") or data.get("representantLegal")
-            if is_pm and rep:
-                self.kyb_representant_legal = str(rep)
+            clean_rep = _clean_algerian_representant(rep) if rep else False
+            if is_pm and clean_rep:
+                self.kyb_representant_legal = clean_rep
             elif is_pp:
-                self.kyb_representant_legal = str(rep) if rep else (f"{self.name} (Titulaire)" if self.name else False)
+                self.kyb_representant_legal = clean_rep if clean_rep else (f"{self.name} (Titulaire)" if self.name else False)
 
             nif = data.get("nif") or ""
             if nif:
@@ -1573,21 +1758,40 @@ class ResPartner(models.Model):
                 if "company_type" in self._fields:
                     self.company_type = "person"
 
+            rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
+            rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "") or ""
+
             date_crea = data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation")
             norm_crea = _normalize_algerian_date(date_crea)
+            # Only an exact registry date is ever written to the Date field (never a deduced 01/01).
             if norm_crea:
                 self.kyb_date_creation = norm_crea
 
-            rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or ""
-            rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or data.get("numero_rc", "") or ""
-            rc = format_official_rc(rc_official or rc_raw, self.kyb_date_creation) or rc_official or rc_raw
+            # ── Adresse & Wilaya Découplée: Résolution Géographique Cohérente ──
+            adresse = data.get("adresse") or data.get("adresseSiegeSocial", "")
+            wilaya_raw = data.get("wilaya", "")
+            cp_raw = data.get("code_postal") or data.get("codePostal") or ""
+            addr_parsed = _parse_algerian_address_components(adresse, wilaya_raw, cp_raw, raw_nif=self.kyb_nif or nif)
+            wilaya_name = addr_parsed["wilaya_name"]
+            wilaya_code = addr_parsed["wilaya_code"]
+
+            self.street = addr_parsed["street"]
+            self.street2 = addr_parsed["street2"]
+            self.city = addr_parsed["city"]
+            if addr_parsed["zip"]:
+                self.zip = addr_parsed["zip"]
+            if data.get("telephone") and not self.phone:
+                self.phone = str(data.get("telephone")).strip()
+
+            fallback_y = self.kyb_date_creation or (self.kyb_nif[2:4] if self.kyb_nif and len(self.kyb_nif) in (15, 20) and self.kyb_nif.isdigit() else None)
+            rc = format_official_rc(rc_official or rc_raw, fallback_y, wilaya_code) or rc_official or rc_raw
             if rc:
                 self.kyb_rc = rc
                 if "company_registry" in self._fields:
                     self.company_registry = rc
 
             raison = data.get("raison_sociale") or data.get("raisonSociale") or data.get("name", "")
-            if raison and (not self.name or self.name.strip() in (query, rc, nif, "Nouveau", "New", "Default")):
+            if raison:
                 self.name = raison
 
             statut = (data.get("statut_cnrc") or data.get("statutCnrc") or data.get("statut") or "INCONNU").upper()
@@ -1651,34 +1855,26 @@ class ResPartner(models.Model):
             else:
                 self.kyb_activites_rc = False
 
-            adresse = data.get("adresse") or data.get("adresseSiegeSocial", "")
-            wilaya_raw = data.get("wilaya", "")
-            cp_raw = data.get("code_postal") or data.get("codePostal") or ""
-            addr_parsed = _parse_algerian_address_components(adresse, wilaya_raw, cp_raw)
-            wilaya_name = addr_parsed["wilaya_name"]
-            wilaya_code = addr_parsed["wilaya_code"]
-
-            self.street = addr_parsed["street"]
-            self.street2 = addr_parsed["street2"]
-            self.city = addr_parsed["city"]
-            if addr_parsed["zip"]:
-                self.zip = addr_parsed["zip"]
-            if data.get("telephone") and not self.phone:
-                self.phone = str(data.get("telephone")).strip()
-
             # Resolve Country & State
             dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
             self.country_id = dz_country.id if dz_country else False
             if wilaya_name and dz_country:
-                domain = [("country_id", "=", dz_country.id)]
-                if wilaya_code:
-                    domain.extend(["|", ("code", "=", wilaya_code), ("name", "ilike", wilaya_name)])
-                else:
-                    domain.append(("name", "ilike", wilaya_name))
-                st = self.env["res.country.state"].search(domain, limit=1)
+                st = False
+                # 1. Exact Wilaya code match (01..58)
+                if wilaya_code and str(wilaya_code).isdigit():
+                    st = self.env["res.country.state"].search([
+                        ("country_id", "=", dz_country.id),
+                        ("code", "=", str(wilaya_code).zfill(2))
+                    ], limit=1)
+                # 2. Exact case-insensitive name match (=ilike, strictly preventing substring joins like 'Ibn Ziad/Constantine')
+                if not st:
+                    st = self.env["res.country.state"].search([
+                        ("country_id", "=", dz_country.id),
+                        ("name", "=ilike", wilaya_name)
+                    ], limit=1)
                 if not st:
                     try:
-                        w_code = wilaya_code or wilaya_name[:2].upper()
+                        w_code = str(wilaya_code).zfill(2) if (wilaya_code and str(wilaya_code).isdigit()) else wilaya_name[:2].upper()
                         st = self.env["res.country.state"].sudo().create({
                             "name": wilaya_name,
                             "code": w_code,
@@ -2118,20 +2314,28 @@ class ResPartner(models.Model):
         raw_street = data.get("adresse") or data.get("adresseSiegeSocial") or ""
         raw_wilaya = data.get("wilaya") or candidate_ctx.get("wilaya") or ""
         raw_cp = data.get("code_postal") or data.get("codePostal") or candidate_ctx.get("code_postal") or ""
-        addr_parsed = _parse_algerian_address_components(raw_street, raw_wilaya, raw_cp)
+        nif_candidate = data.get("nif") or candidate_ctx.get("vat") or candidate_ctx.get("nif") or ""
+        addr_parsed = _parse_algerian_address_components(raw_street, raw_wilaya, raw_cp, raw_nif=nif_candidate)
         wilaya_name = addr_parsed["wilaya_name"] or str(raw_wilaya).title()
         wilaya_code = addr_parsed["wilaya_code"]
 
         if wilaya_name and dz_country:
-            search_domain = [("country_id", "=", dz_country.id)]
-            if wilaya_code:
-                search_domain.extend(["|", ("code", "=", wilaya_code), ("name", "ilike", wilaya_name)])
-            else:
-                search_domain.append(("name", "ilike", wilaya_name))
-            state = self.env["res.country.state"].search(search_domain, limit=1)
+            state = False
+            # 1. Exact Wilaya code match (01..58)
+            if wilaya_code and str(wilaya_code).isdigit():
+                state = self.env["res.country.state"].search([
+                    ("country_id", "=", dz_country.id),
+                    ("code", "=", str(wilaya_code).zfill(2))
+                ], limit=1)
+            # 2. Exact case-insensitive name match (=ilike, strictly preventing substring joins like 'Ibn Ziad/Constantine')
+            if not state:
+                state = self.env["res.country.state"].search([
+                    ("country_id", "=", dz_country.id),
+                    ("name", "=ilike", wilaya_name)
+                ], limit=1)
             if not state:
                 try:
-                    w_code = wilaya_code or wilaya_name[:2].upper()
+                    w_code = str(wilaya_code).zfill(2) if (wilaya_code and str(wilaya_code).isdigit()) else wilaya_name[:2].upper()
                     if not w_code.isalnum():
                         w_code = "DZ"
                     state = self.env["res.country.state"].sudo().create({
@@ -2190,10 +2394,11 @@ class ResPartner(models.Model):
             statut_mapped = "INCONNU"
 
         # ── Strict Algerian Classification: Personne Morale vs Personne Physique ──
-        date_crea_val = _normalize_algerian_date(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))
         rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or candidate_ctx.get("rc_official") or ""
         rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or candidate_ctx.get("rc_number") or ""
-        rc_val = format_official_rc(rc_official or rc_raw, date_crea_val) or rc_official or rc_raw
+        date_crea_val = _normalize_algerian_date(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))
+        fallback_y = date_crea_val or (nif_candidate[2:4] if nif_candidate and len(nif_candidate) in (15, 20) and nif_candidate.isdigit() else None)
+        rc_val = format_official_rc(rc_official or rc_raw, fallback_y, addr_parsed["wilaya_code"]) or rc_official or rc_raw
         forme_val = data.get("forme_juridique") or data.get("formeJuridique") or ""
 
         is_pm = False
@@ -2225,7 +2430,7 @@ class ResPartner(models.Model):
             "kyb_nae_codes": nae_str,
             "kyb_activites_rc": "\n".join(secondary_acts_lines) if secondary_acts_lines else False,
             "street": addr_parsed["street"] or "",
-            "street2": addr_parsed["street2"] or "",
+            "street2": addr_parsed["street2"] or False,
             "city": addr_parsed["city"] or "",
             "zip": addr_parsed["zip"] or "",
         }
@@ -2252,8 +2457,10 @@ class ResPartner(models.Model):
         elif is_pp:
             enrich_dict["kyb_capital_social"] = "N/A (Patrimoine Individuel)"
 
-        if data.get("representant_legal") or data.get("representantLegal"):
-            enrich_dict["kyb_representant_legal"] = str(data.get("representant_legal") or data.get("representantLegal"))
+        rep_raw = data.get("representant_legal") or data.get("representantLegal")
+        clean_rep = _clean_algerian_representant(rep_raw) if rep_raw else False
+        if clean_rep:
+            enrich_dict["kyb_representant_legal"] = clean_rep
         elif is_pp:
             enrich_dict["kyb_representant_legal"] = str(enrich_dict.get("name") or "") + " (Titulaire)"
         if dz_country_dict:
@@ -2298,4 +2505,5 @@ class ResPartner(models.Model):
             self.env["res.config.settings"].cron_kyb_sync_telemetry()
         except Exception as err:
             _logger.warning("KYB res.partner cron telemetry failed: %s", err)
+        return True
 

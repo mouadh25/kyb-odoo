@@ -338,6 +338,15 @@ class AccountMove(models.Model):
                             f"La présente facture est datée du {inv_date} (postérieurement à la date de radiation enregistrée).\n"
                             f"Information : Selon les dispositions des Art. 169 & 176 CIDTA et Art. 30 CTCA, une vérification comptable préalable est recommandée."
                         )
+                elif rad_date_obj and inv_date_obj and inv_date_obj <= rad_date_obj:
+                    move.kyb_compliance_status = "compliant"
+                    move.kyb_tax_deductible = True
+                    move.kyb_audit_date = fields.Datetime.now()
+                    role_label = "Client" if is_sale else "Fournisseur"
+                    move.kyb_compliance_message = (
+                        f"✅ {role_label} Actif à la Date de Facturation (Audit Temporel) :\n"
+                        f"Bien que le partenaire '{partner.name}' soit radié depuis le {rad_date}, la présente pièce datée du {inv_date} est antérieure ou concomitante à la date de radiation et demeure fiscalement conforme."
+                    )
                 else:
                     move.kyb_compliance_status = "warning"
                     move.kyb_tax_deductible = False

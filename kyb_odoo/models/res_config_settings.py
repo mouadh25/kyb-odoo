@@ -332,6 +332,11 @@ class ResConfigSettings(models.TransientModel):
             "configuration": config_posture,
         }
 
+    @api.model
+    def get_kyb_instance_telemetry(self):
+        """Public RPC wrapper returning the instance telemetry dictionary."""
+        return self._gather_instance_telemetry()
+
     def action_check_kyb_update(self):
         """Manually triggers version check and telemetry heartbeat to KYB Gateway."""
         import requests
@@ -554,4 +559,5 @@ class ResConfigSettings(models.TransientModel):
                 settings.action_upgrade_kyb_module()
         except Exception as err:
             _logger.warning("KYB cron telemetry sync failed: %s", err)
+        return True
 

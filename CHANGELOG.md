@@ -23,7 +23,7 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 ---
 
-## [2.0.8] - 2026-11-04
+## [2.0.8] - 2026-11-07
 
 ### Added
 * **Configurable Customer Invoice Compliance Governance (`kyb.customer_invoice_policy` — Ventes & État 104):**
@@ -33,10 +33,20 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
     * `badge_only`: *Badge Uniquement* — Updates `kyb_compliance_status` (`Non Conforme (Tiers Radié)`) and the KYB tab audit report silently without modal dialogs or Chatter notes on sales invoices.
   * Automatically evaluates `kyb_compliance_status` upon `account.move.create()` and `write()` so invoices generated from Sales Orders (`sale.order` -> *Créer une facture*) or Purchase Orders immediately display their compliance status (`compliant`, `warning`, `non_compliant`) in Draft state without requiring manual audit clicks.
   * Preserves strict configurable blocking (`strict_block` / `soft_warn`) on Purchase Bills (`in_invoice` / `in_refund`) under Articles 169 & 176 CIDTA and Article 30 CTCA.
+* **5 Statutory Legal Invariants & Address / Governance Normalization:**
+  * **Verbatim Décret 05-468 RC Preservation:** Preserves modern electronic national trade register numbers (e.g. `24/00-1052733B24`) verbatim without rewriting prefixes from address Wilayas.
+  * **Universal Invoice RC Format Recognition:** Seamlessly resolves official slashed (`24/00-1052733B24`), compact (`24B1052733`), single-digit wilaya (`9B0068239`), prefixed (`RC: ...`), and Arabic-numeral Trade Register strings.
+  * **Exact Registration Date Integrity:** Populates `kyb_date_creation` strictly when an authenticated day/month/year is published; keeps the date field `False` when only the registration year is known (preventing arbitrary `01/01/YYYY` assumptions).
+  * **Administrative Commune & Wilaya Decoupling:** Separates `city` (Commune) from `state_id` (Wilaya), enforces `street2 = False`, strips trailing locality repetitions from `street`, and maps official 5-digit Algerian postal codes (`zip`).
+  * **Sanitized Governance & NAE Nomenclature:** Strips publication action verbs (`Désigner`, `Nommer`) from `kyb_representant_legal` and formats primary economic activities strictly as `[CODE] LIBELLÉ` with secondary NAE codes as clean bullet lists.
+* **10-Second Anti-Rebond Credit Protection Guard:**
+  * Added a 10-second debounce guard on `action_verify_kyb()` ("Vérifier Fiche KYB") to prevent accidental credit consumption on rapid repeated clicks.
 * **In-Memory Python Hot-Reload during 1-Click Upgrades (`migrations/0.0.0/pre-migrate.py` & `post-migrate.py`):**
   * Automatically reloads `odoo.addons.kyb_odoo` modules in-place (`importlib.reload`) and refreshes ORM model hooks during `button_immediate_upgrade()`, ensuring 1-click in-app updates apply Python model changes immediately with zero container restarts.
 
 ### Fixed
+* **Single-Card Institutional Chatter Typography & Author Attribution:**
+  * Replaced Bootstrap pink/red `<code>` tags with clean zinc monospace (`#18181b`), converted the card header to a 100%-width 2-column table to prevent badge collisions under `html_sanitize`, and attributed statutory audit notes directly to the active authenticated user (`author_id`).
 * **Suppressed Duplicate ORM Field-Diff Tracking on Partner Re-Verification:**
   * Applied `tracking_disable=True` and `mail_notrack=True` at the entry of `ResPartner._do_kyb_resolve()` for existing records so re-verifying a partner posts only the institutional KYB card.
 * **Accurate Invoice Telemetry Counters & Role-Neutral Labels:**

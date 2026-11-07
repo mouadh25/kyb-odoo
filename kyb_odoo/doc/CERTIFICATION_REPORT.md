@@ -1,6 +1,6 @@
 # KYB Odoo Connector — Enterprise E2E Certification Report
 
-**Target Versions:** `kyb_odoo` v16.0.2.0.8 · v17.0.2.0.8 · v18.0.2.0.8 · v19.0.2.0.8 · v20.0.2.0.8  
+**Target Versions:** `kyb_odoo` v16.0.2.0.9 · v17.0.2.0.9 · v18.0.2.0.9 · v19.0.2.0.9 · v20.0.2.0.9  
 **Live Target:** [https://odoo20.digidevagency.dz](https://odoo20.digidevagency.dz) (Odoo 16.0 – 20.0 Multi-Version Fleet)  
 **Database:** `odoo20_db` (Fresh Certified Baseline)  
 **Certification Date:** 07/11/2026  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-The official **KYB Odoo Connector** (`kyb_odoo`) release **`[series].2.0.8`** has undergone complete real-world End-to-End (E2E) testing and validation on the production Algérie Télécom Sovereign Cloud environment across all 5 supported Odoo release series (**Odoo 16.0, 17.0, 18.0, 19.0, and 20.0**).
+The official **KYB Odoo Connector** (`kyb_odoo`) release **`[series].2.0.9`** has undergone complete real-world End-to-End (E2E) testing and validation on the production Algérie Télécom Sovereign Cloud environment across all 5 supported Odoo release series (**Odoo 16.0, 17.0, 18.0, 19.0, and 20.0**).
 
 All **25 real-world fiscal, identity, Personne Physique Décret 05-468, and single-card OWL Chatter scenarios** passed with zero defects (100% success rate).
 

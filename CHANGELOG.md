@@ -15,15 +15,36 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 
 | Odoo Target Version | Module Version Code | Market Tier | Compatibility Status |
 | :--- | :--- | :--- | :---: |
-| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.8` | Current Released Generation | **🟢 Locked & Certified** |
-| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.8` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.8` | Active Production Standard | **🟢 Locked & Certified** |
-| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.8` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
-| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.8` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 20.0** (Community & Enterprise) | `20.0.2.0.9` | Current Released Generation | **🟢 Locked & Certified** |
+| **Odoo 19.0** (Community & Enterprise) | `19.0.2.0.9` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.9` | Active Production Standard | **🟢 Locked & Certified** |
+| **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.9` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
+| **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.9` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
 
 ---
 
-## [2.0.8] - 2026-11-07
+## [2.0.9] - 2026-11-07
+
+### Added
+* **Décret Exécutif n° 05-468 (Art. 3) Personne Physique Statutory Identity Engine:**
+  * Enforces Algerian commercial law naming for individual merchants (Category A/C & Auto-Entrepreneurs): civil identity (`NOM PRÉNOM`) is legally primary, formatted as `NOM PRÉNOM (NOM COMMERCIAL)` when a distinct commercial sign exists (automatically rejecting BOAL address fragments such as `ESC 02`, `LOT 14`, `BLOC B`, `CITE ...`), else strictly `NOM PRÉNOM`.
+  * Standardizes individual merchant governance fields: `kyb_representant_legal = NOM PRÉNOM (Titulaire)`, `kyb_forme_juridique = Personne Physique`, `kyb_capital_social = N/A (Patrimoine Individuel)`, and `is_company = False` (`company_type = person`).
+* **Automatic NIF-to-CNRC Category A Enrichment Cascade:**
+  * Resolving a natural person by their 15/20-digit NIF (`185250600194154`) when `kyb_rc` is empty automatically triggers a live Category A registry discovery and enriches the official Trade Register (`11/00-0365048A11`) and NAE activity nomenclature.
+
+### Fixed
+* **Single-Card In-Place Update & OWL Chatter Bus Synchronization (Zero Double Cards):**
+  * Updated `_post_kyb_audit_log()` to modify `existing_cards[0]` in-place (`existing_cards[0].write(update_vals)`), unlink any extra legacy cards (`existing_cards[1:].unlink()`), and explicitly broadcast the updated `body` to the active user's OWL `Store` over `bus.bus`. Preserves a single `mail.message` ID (`same_card_id_in_place = True`), eliminating double cards in both PostgreSQL and the browser OWL Chatter across all creation, autocomplete, and re-verification workflows.
+* **Cross-Version `_message_track` & Deferred Precommit Tracking Suppression (Odoo 16.0 – 20.0):**
+  * Overrode `_message_track(self, fields_iter, initial_values)` to pass `fields_iter = ()` into `super()` when `mail_notrack` / `tracking_disable` is active or when the partner has `kyb_nif` / `kyb_rc` (preserving Odoo 16's `({}, {})` tuple and Odoo 17–20's `{}` dict return signatures).
+  * Added `self.env.flush_all()` and `self.env.cr.precommit.run()` at the start of `_post_kyb_audit_log()` so deferred Odoo 20 precommit tracking hooks (`Company Name Entity` / `Dénomination de la société`) are flushed and purged before writing the single audit card.
+* **Stale Duplicate NIF Warning Cleanup & Address Street Preservation:**
+  * Automatically purges stale `Doublon Fiscal` warnings from Chatter when a partner's NIF changes and deduplicates warnings for the same NIF.
+  * Preserves street strings (`street`) when `wilaya` is empty unless `_split_algerian_commune_wilaya` resolves a valid 2-digit Wilaya code.
+
+---
+
+## [2.0.8] - 2026-11-06
 
 ### Added
 * **Configurable Customer Invoice Compliance Governance (`kyb.customer_invoice_policy` — Ventes & État 104):**

@@ -1163,7 +1163,61 @@ class ResPartner(models.Model):
                         ("body", "ilike", "%Avertissement Doublon Fiscal%"),
                     ], limit=1)
                     if not existing_warn:
-                        record.message_post(body=msg)
+                        warn_author = self._get_session_author_partner(record)
+                        record.message_post(
+                            body=msg,
+                            author_id=warn_author.id if warn_author else False,
+                        )
+
+    def _get_session_author_partner(self, partner=None):
+        """
+        Resolve the human session owner's res.partner record for Chatter traceability
+        (showing who created/verified the contact), strictly avoiding OdooBot / System
+        (SUPERUSER_ID=1 / base.user_root) when called inside a .sudo() context or CLI/cron.
+        """
+        try:
+            root_user = self.env.ref("base.user_root", raise_if_not_found=False)
+            root_uid = root_user.id if root_user else 1
+        except Exception:
+            root_uid = 1
+
+        candidates = []
+        # 1. Active env.user if it is a human user (not SUPERUSER_ID / OdooBot)
+        cur_user = getattr(self.env, "user", None)
+        if cur_user and getattr(cur_user, "id", None) and cur_user.id != root_uid:
+            candidates.append(cur_user)
+
+        # 2. HTTP session UID from context (preserved even when .sudo() switches env.uid to 1)
+        ctx_uid = (getattr(self.env, "context", None) or {}).get("uid")
+        if isinstance(ctx_uid, int) and ctx_uid > 0 and ctx_uid != root_uid:
+            try:
+                candidates.append(self.env["res.users"].sudo().browse(ctx_uid))
+            except Exception:
+                pass
+
+        # 3. Contact creator / modifier (who created or last edited the partner record)
+        if partner is not None:
+            for u_field in ("write_uid", "create_uid"):
+                u_rec = getattr(partner, u_field, None)
+                if u_rec and getattr(u_rec, "id", None) and u_rec.id != root_uid:
+                    candidates.append(u_rec)
+
+        # 4. Fallback to Administrator (base.user_admin, uid=2) instead of OdooBot
+        try:
+            admin_user = self.env.ref("base.user_admin", raise_if_not_found=False)
+            if admin_user:
+                candidates.append(admin_user)
+        except Exception:
+            pass
+
+        for usr in candidates:
+            try:
+                if usr and usr.exists() and usr.partner_id:
+                    return usr.partner_id
+            except Exception:
+                continue
+
+        return getattr(cur_user, "partner_id", None)
 
     def _post_kyb_audit_log(self):
         """
@@ -1303,9 +1357,10 @@ class ResPartner(models.Model):
                 f'</div>'
                 '</div>'
             )
-            # Chatter author attribution: assign message to the active session user (e.g. Administrator)
+            # Chatter author attribution: assign message to the active human session owner (e.g. Administrator)
+            # rather than OdooBot (SUPERUSER_ID=1) for full audit traceability of who created/verified the contact.
             # subtype_xmlid="mail.mt_note" renders Odoo's native light-green note bubble directly (zero nested card-inside-card)
-            user_partner = getattr(getattr(self.env, "user", None), "partner_id", None)
+            user_partner = self._get_session_author_partner(partner)
             author_id = user_partner.id if user_partner else False
             note_subtype = self.env.ref("mail.mt_note", raise_if_not_found=False)
             try:

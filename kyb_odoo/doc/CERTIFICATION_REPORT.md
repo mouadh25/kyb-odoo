@@ -56,4 +56,5 @@ All **25 real-world fiscal, identity, Personne Physique Décret 05-468, and sing
 - **Invoice Audit Latency:** < 100 ms
 - **Invoice Posting Overhead:** < 300 ms
 - **Data Residency:** 100% Algérie Télécom Sovereign Datacenter (Algiers)
+- **Live Browser UI & QWeb Asset Verification (`16.0`–`20.0`):** Every Odoo release series (`16.0.2.0.9` through `20.0.2.0.9`) passed mandatory live headless browser rendering and visual screenshot inspection of the `KYB — Fiscal Verification` tab and single-card OWL Chatter (`0` QWeb/JS errors, `0` duplicate cards, `0` tracking noise).
 

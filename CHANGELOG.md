@@ -45,10 +45,15 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
   * Automatically reloads `odoo.addons.kyb_odoo` modules in-place (`importlib.reload`) and refreshes ORM model hooks during `button_immediate_upgrade()`, ensuring 1-click in-app updates apply Python model changes immediately with zero container restarts.
 
 ### Fixed
-* **Single-Card Institutional Chatter Typography & Author Attribution:**
+* **Single-Card In-Place Update & OWL Chatter Bus Synchronization:**
+  * Updated `_post_kyb_audit_log()` to modify `existing_cards[0]` in-place (`existing_cards[0].write(update_vals)`), unlink any extra cards (`existing_cards[1:].unlink()`), and explicitly push the updated `body` to the active user's OWL `Store` over `bus.bus` (`Store(card).add(card, ["body"])`). Guarantees strictly **1** `Vérification KYB` card in both PostgreSQL and the browser OWL Chatter across all workflows.
   * Replaced Bootstrap pink/red `<code>` tags with clean zinc monospace (`#18181b`), converted the card header to a 100%-width 2-column table to prevent badge collisions under `html_sanitize`, and attributed statutory audit notes directly to the active authenticated user (`author_id`).
-* **Suppressed Duplicate ORM Field-Diff Tracking on Partner Re-Verification:**
-  * Applied `tracking_disable=True` and `mail_notrack=True` at the entry of `ResPartner._do_kyb_resolve()` for existing records so re-verifying a partner posts only the institutional KYB card.
+* **Décret Exécutif n° 05-468 Personne Physique Legal Identity Naming & NIF-to-CNRC Category A Cascade:**
+  * Enforced statutory naming for individual merchants (Category A/C & Auto-Entrepreneurs): civil identity (`NOM PRÉNOM`) is primary, formatted as `NOM PRÉNOM (NOM COMMERCIAL)` when a distinct commercial sign exists (rejecting BOAL address fragments like `ESC 02`), with `kyb_representant_legal = NOM PRÉNOM (Titulaire)`, `kyb_forme_juridique = Personne Physique`, `kyb_capital_social = N/A (Patrimoine Individuel)`, and `is_company = False` (`company_type = person`).
+  * Enabled automatic NIF-to-CNRC Category A RC and NAE activity enrichment when resolving a natural person NIF (`185250600194154` → `11/00-0365048A11`).
+* **Suppressed Deferred Precommit ORM Field-Diff Tracking & Stale Duplicate NIF Warnings:**
+  * Applied `tracking_disable=True`, `mail_notrack=True`, and `kyb_skip_audit_post=True` across all KYB write paths and overrode `_message_track()` so re-verifying or switching a partner in autocomplete never emits raw field-diff tracking lines (`Company Name Entity` / `Dénomination de la société`).
+  * Automatically purges stale `Doublon Fiscal` warnings when a partner's NIF changes and deduplicates warnings for the same NIF.
 * **Accurate Invoice Telemetry Counters & Role-Neutral Labels:**
   * Aligned `_gather_instance_telemetry()` with `kyb_compliance_status` on `account.move` and standardized invoice badge labels across all languages to **Tiers Radié** / **Tiers Actif (Vérifié)**.
 

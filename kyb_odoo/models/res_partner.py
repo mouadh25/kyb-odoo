@@ -405,7 +405,14 @@ def _parse_algerian_address_components(
             cp_commune = cp_label.title()
 
     # 2. Extract base commune/wilaya from raw_wilaya or slash-separated address
-    commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(wilaya_str or adresse_str)
+    if wilaya_str:
+        commune_name, wilaya_name, wilaya_code = _split_algerian_commune_wilaya(wilaya_str)
+    else:
+        c_tmp, w_tmp, wc_tmp = _split_algerian_commune_wilaya(adresse_str)
+        if wc_tmp:
+            commune_name, wilaya_name, wilaya_code = c_tmp, w_tmp, wc_tmp
+        else:
+            commune_name, wilaya_name, wilaya_code = "", "", ""
 
     # 3. Extract inline 'Commune X' and 'Wilaya de Y' from adresse_str and strip from street
     clean_street = adresse_str
@@ -1086,15 +1093,18 @@ class ResPartner(models.Model):
                 vals["kyb_rc"] = fmt_rc
                 if "company_registry" in self._fields:
                     vals["company_registry"] = fmt_rc
-        # Suppress ORM field-diff tracking chatter when saving KYB-enriched fields
+        # Suppress ORM field-diff tracking chatter when saving KYB-enriched fields or updating company identity
         kyb_write_keys = {
             "kyb_nif", "kyb_rc", "kyb_nis", "kyb_statut_cnrc",
             "kyb_capital_social", "kyb_representant_legal", "kyb_forme_juridique",
             "kyb_activite", "kyb_nae_codes", "kyb_activites_rc",
-            "kyb_date_creation", "kyb_date_radiation", "kyb_last_verified"
+            "kyb_date_creation", "kyb_date_radiation", "kyb_last_verified",
         }
-        if any(k in vals for k in kyb_write_keys):
-            res = super(ResPartner, self.with_context(tracking_disable=True, mail_notrack=True)).write(vals)
+        is_kyb_write = any(k in vals for k in kyb_write_keys) or (
+            ("name" in vals or "vat" in vals) and any(bool(getattr(r, "kyb_nif", False) or getattr(r, "kyb_rc", False)) for r in self)
+        )
+        if is_kyb_write:
+            res = super(ResPartner, self.with_context(tracking_disable=True, mail_notrack=True, mail_create_nolog=True)).write(vals)
             # If this write populated KYB verification data (e.g. when selecting from autocomplete on an existing draft),
             # ensure the green/red institutional KYB card is posted/updated in chatter.
             if not (getattr(self.env, "context", None) or {}).get("kyb_skip_audit_post"):
@@ -1103,6 +1113,15 @@ class ResPartner(models.Model):
                         rec.with_context(kyb_skip_audit_post=True)._post_kyb_audit_log()
             return res
         return super().write(vals)
+
+    def _message_track(self, fields_iter, initial_values):
+        if (
+            self.env.context.get("mail_notrack")
+            or self.env.context.get("tracking_disable")
+            or any(bool(getattr(r, "kyb_nif", False) or getattr(r, "kyb_rc", False)) for r in self)
+        ):
+            fields_iter = ()
+        return super()._message_track(fields_iter, initial_values)
 
     @api.constrains("kyb_nif", "vat")
     def _check_duplicate_nif(self):
@@ -1137,7 +1156,14 @@ class ResPartner(models.Model):
                     msg = _(
                         "⚠️ Avertissement Doublon Fiscal : Le NIF '%(nif)s' est déjà attribué au partenaire '%(dup_name)s' (ID: %(dup_id)s)."
                     ) % {"nif": nif, "dup_name": duplicate.name, "dup_id": duplicate.id}
-                    record.message_post(body=msg)
+                    existing_warn = self.env["mail.message"].sudo().search([
+                        ("model", "=", "res.partner"),
+                        ("res_id", "=", record.id),
+                        ("body", "ilike", f"%{nif}%"),
+                        ("body", "ilike", "%Avertissement Doublon Fiscal%"),
+                    ], limit=1)
+                    if not existing_warn:
+                        record.message_post(body=msg)
 
     def _post_kyb_audit_log(self):
         """
@@ -1155,19 +1181,36 @@ class ResPartner(models.Model):
         for partner in self:
             if not hasattr(partner, "message_post"):
                 continue
-            # Strict Chatter Deduplication Guard: Remove generic creation/tracking noise
+            # Flush any pending ORM / precommit field-tracking hooks first so no deferred
+            # tracking message can be created after _post_kyb_audit_log finishes (Odoo 16-20).
             try:
+                if hasattr(self.env, "flush_all"):
+                    self.env.flush_all()
+                if hasattr(self.env, "cr") and hasattr(self.env.cr, "precommit"):
+                    self.env.cr.precommit.run()
+            except Exception:
+                pass
+            # Strict Chatter Deduplication Guard: Remove generic creation/tracking noise & stale duplicate warnings
+            try:
+                cur_nif = (partner.kyb_nif or partner.vat or "").strip()
                 all_msgs = self.env["mail.message"].sudo().search([
                     ("model", "=", "res.partner"),
                     ("res_id", "=", partner.id),
                 ])
                 for m in all_msgs:
                     b_str = str(m.body or "")
-                    if "Vérification KYB" in b_str or "Doublon" in b_str:
+                    if "Vérification KYB" in b_str:
+                        continue
+                    if "Doublon" in b_str:
+                        # If the partner's current NIF has changed or no longer matches the warning, purge stale warning
+                        if not cur_nif or cur_nif not in b_str:
+                            m.unlink()
                         continue
                     is_noise = (
                         "Contact créé" in b_str
                         or "Partner created" in b_str
+                        or "Dénomination de la société" in b_str
+                        or "Company Name" in b_str
                         or m.message_type == "tracking"
                         or bool(getattr(m, "tracking_value_ids", False))
                     )
@@ -1265,20 +1308,64 @@ class ResPartner(models.Model):
             user_partner = getattr(getattr(self.env, "user", None), "partner_id", None)
             author_id = user_partner.id if user_partner else False
             note_subtype = self.env.ref("mail.mt_note", raise_if_not_found=False)
-            existing_cards = self.env["mail.message"].sudo().search([
-                ("model", "=", "res.partner"),
-                ("res_id", "=", partner.id),
-                ("body", "ilike", "%Vérification KYB%"),
-            ], order="id desc")
+            try:
+                existing_cards = self.env["mail.message"].sudo().search([
+                    ("model", "=", "res.partner"),
+                    ("res_id", "=", partner.id),
+                    ("body", "ilike", "%Vérification KYB%"),
+                ], order="id desc")
+            except Exception:
+                existing_cards = []
+            # Strictly maintain a single card ID (zero double cards in DB or OWL Chatter):
+            # Update existing_cards[0] in-place and broadcast the updated body over the bus.
             if existing_cards:
-                upd_vals = {"body": Markup(body)}
-                if note_subtype:
-                    upd_vals["subtype_id"] = note_subtype.id
-                existing_cards[0].write(upd_vals)
+                card = existing_cards[0]
                 if len(existing_cards) > 1:
+                    extra_ids = existing_cards[1:].ids
+                    try:
+                        if user_partner and hasattr(user_partner, "_bus_send"):
+                            user_partner._bus_send("mail.message/delete", {"message_ids": extra_ids})
+                    except Exception:
+                        pass
                     existing_cards[1:].unlink()
+                update_vals = {"body": Markup(body), "date": fields.Datetime.now()}
+                if author_id:
+                    update_vals["author_id"] = author_id
+                if note_subtype:
+                    update_vals["subtype_id"] = note_subtype.id
+                card.write(update_vals)
+                try:
+                    from odoo.addons.mail.tools.discuss import Store
+                    if hasattr(card, "_bus_send_store"):
+                        card._bus_send_store(card, {"body": card.body, "write_date": card.write_date})
+                    elif hasattr(card, "_bus_channel"):
+                        st = Store(bus_channel=card._bus_channel()).add(card, ["body", "write_date"])
+                        if hasattr(st, "bus_send"):
+                            st.bus_send()
+                    else:
+                        for chan in (card, self.env.user):
+                            if chan:
+                                Store(bus_channel=chan).add(
+                                    card,
+                                    lambda res: (res.attr("body"), res.attr("write_date")),
+                                )
+                except Exception:
+                    try:
+                        if user_partner and "bus.bus" in self.env:
+                            self.env["bus.bus"]._sendone(
+                                user_partner,
+                                "mail.record/insert",
+                                {"Message": {"id": card.id, "body": card.body, "write_date": str(card.write_date)}},
+                            )
+                    except Exception:
+                        pass
             else:
-                partner.message_post(body=Markup(body), author_id=author_id, message_type="comment", subtype_xmlid="mail.mt_note")
+                partner.with_context(kyb_skip_audit_post=True).message_post(
+                    body=Markup(body),
+                    author_id=author_id,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
         return True
 
     def enrich_company_message_post(self, data):
@@ -1398,7 +1485,7 @@ class ResPartner(models.Model):
             if vals:
                 # tracking_disable=True: suppress Odoo ORM field-diff chatter; the
                 # institutional KYB card from _post_kyb_audit_log() is the sole audit trail.
-                partner.with_context(tracking_disable=True).write(vals)
+                partner.with_context(tracking_disable=True, mail_notrack=True, kyb_skip_audit_post=True).write(vals)
 
             partner._post_kyb_audit_log()
         return True
@@ -1412,6 +1499,7 @@ class ResPartner(models.Model):
             and self.kyb_statut_cnrc in ("ACTIF", "RADIE", "SUSPENDU")
             and self.name
             and self.kyb_nif
+            and self.kyb_rc
             and (self.kyb_capital_social or self.kyb_representant_legal)
             and (fields.Datetime.now() - self.kyb_last_verified).total_seconds() < 10
         ):
@@ -1426,7 +1514,7 @@ class ResPartner(models.Model):
                     },
                     "sticky": False,
                     "type": "success",
-                    "next": {"type": "ir.actions.act_window_close"},
+                    "next": {"type": "ir.actions.client", "tag": "soft_reload"},
                 },
             }
         query = (
@@ -1452,7 +1540,7 @@ class ResPartner(models.Model):
                     "message": warn.get("message", _("Aucune entité trouvée.")),
                     "sticky": False,
                     "type": "warning",
-                    "next": {"type": "ir.actions.act_window_close"},
+                    "next": {"type": "ir.actions.client", "tag": "soft_reload"},
                 },
             }
         return {
@@ -1466,7 +1554,7 @@ class ResPartner(models.Model):
                 },
                 "sticky": False,
                 "type": "success",
-                "next": {"type": "ir.actions.act_window_close"},
+                "next": {"type": "ir.actions.client", "tag": "soft_reload"},
             },
         }
 
@@ -1927,11 +2015,17 @@ class ResPartner(models.Model):
                     write_vals["company_registry"] = self.company_registry
                 # tracking_disable=True: suppress Odoo ORM field-diff chatter; the
                 # institutional KYB card from _post_kyb_audit_log() is the sole audit trail.
-                self.with_context(tracking_disable=True).write(write_vals)
+                self.with_context(tracking_disable=True, mail_notrack=True, kyb_skip_audit_post=True).write(write_vals)
                 if is_pp:
-                    self.with_context(tracking_disable=True).write({"is_company": False})
+                    pp_post = {"is_company": False}
+                    if "company_type" in self._fields:
+                        pp_post["company_type"] = "person"
+                    self.with_context(tracking_disable=True, mail_notrack=True, kyb_skip_audit_post=True).write(pp_post)
                 elif is_pm:
-                    self.with_context(tracking_disable=True).write({"is_company": True})
+                    pm_post = {"is_company": True}
+                    if "company_type" in self._fields:
+                        pm_post["company_type"] = "company"
+                    self.with_context(tracking_disable=True, mail_notrack=True, kyb_skip_audit_post=True).write(pm_post)
                 self._post_kyb_audit_log()
 
             # ── Duplicate Fiscal Identifier (NIF) Guard ──

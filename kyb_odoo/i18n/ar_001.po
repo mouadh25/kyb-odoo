@@ -44,84 +44,14 @@ msgid "KYB Settings"
 msgstr "إعدادات KYB"
 
 #. module: kyb_odoo
-#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_settings
-msgid "Settings"
-msgstr "الإعدادات"
-
-#. module: kyb_odoo
 #: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
 msgid "KYB Verification"
 msgstr "التحقق KYB"
 
 #. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
-msgid "KYB Corporate Identity & Fiscal Verification"
-msgstr "التحقق السيادي من هوية الشركات والجبايات KYB"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
-msgid "KYB (by Digidev) Credentials"
-msgstr "بيانات اعتماد KYB (من Digidev)"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
-msgid "Configure your KYB secret API key (hosted locally on Algérie Télécom Cloud)."
-msgstr "تهيئة المفتاح السري لـ KYB (المستضاف محلياً بسحابة اتصالات الجزائر)."
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
-msgid "CNRC Autocomplete"
-msgstr "الإكمال التلقائي من السجل التجاري"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
-msgid "Replaces international company search with the National Trade Registry via KYB."
-msgstr "استبدال البحث الدولي بالسجل التجاري الجزائري الوطني عبر KYB."
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
-msgid "Allow Worldwide Fallback Search"
-msgstr "السماح بالبحث الدولي الاحتياطي (Search Worldwide)"
-
-#. module: kyb_odoo
 #: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
 msgid "Verify KYB"
 msgstr "التحقق من ملف KYB"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "KYB — Fiscal Verification"
-msgstr "KYB — التحقق الجبائي"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "KYB Sovereign Verification"
-msgstr "التحقق السيادي KYB"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "Vérifiez l'identité fiscale et le statut CNRC en temps réel."
-msgstr "التحقق الفوري من الهوية الجبائية وحالة السجل التجاري."
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "Fiscal Identification"
-msgstr "الهوية الجبائية"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "Registry Details"
-msgstr "بيانات السجل التجاري"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "Dominant Primary Activity"
-msgstr "النشاط الرئيسي المعتمد"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
-msgid "Secondary RC Activities (CNRC)"
-msgstr "الأنشطة الثانوية في السجل (CNRC)"
 
 #. module: kyb_odoo
 #: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_nif
@@ -197,11 +127,6 @@ msgstr "تدقيق مطابقة KYB"
 #: model:ir.actions.server,name:kyb_odoo.action_bulk_verify_kyb_compliance
 msgid "Audit KYB Compliance (Bulk)"
 msgstr "تدقيق مطابقة KYB (جماعي)"
-
-#. module: kyb_odoo
-#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_move_form_kyb
-msgid "KYB Fiscal Alert: Deduction Rejection Risk"
-msgstr "تنبيه جبائي KYB: خطر رفض استرجاع الرسم والخصم"
 
 #. module: kyb_odoo
 #: model:ir.model.fields,field_description:kyb_odoo.field_account_move__kyb_compliance_status

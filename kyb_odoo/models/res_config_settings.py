@@ -505,7 +505,7 @@ class ResConfigSettings(models.TransientModel):
                         raw_v = m_ver.group(1) if m_ver else "2.0.8"
                         mig_0 = os.path.join(module_path, "migrations", "0.0.0")
                         if os.path.exists(mig_0):
-                            for s_pref in ("16.0", "17.0", "18.0", "19.0", "20.0"):
+                            for s_pref in ("14.0", "15.0", "16.0", "17.0", "18.0", "19.0", "20.0"):
                                 mig_target = os.path.join(module_path, "migrations", f"{s_pref}.{raw_v}")
                                 os.makedirs(mig_target, exist_ok=True)
                                 try:

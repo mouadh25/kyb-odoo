@@ -988,7 +988,10 @@ class ResPartner(models.Model):
         blocking 'Vérifier Fiche KYB' or form save with 'Champs obligatoires manquants'
         when resolving a new partner solely by RC or NIF.
         """
-        arch, view = super()._get_view(view_id=view_id, view_type=view_type, **options)
+        parent_meth = getattr(super(), "_get_view", None)
+        if not callable(parent_meth):
+            return None, None
+        arch, view = parent_meth(view_id=view_id, view_type=view_type, **options)
         if view_type == "form" and arch is not None:
             try:
                 for node in arch.xpath("//field[@name='name']"):
@@ -1123,6 +1126,20 @@ class ResPartner(models.Model):
             fields_iter = ()
         return super()._message_track(fields_iter, initial_values)
 
+    def message_track(self, tracked_fields, initial_values):
+        """Odoo 14.0 & 15.0 MailThread field tracking entrypoint."""
+        if (
+            self.env.context.get("mail_notrack")
+            or self.env.context.get("tracking_disable")
+            or any(bool(getattr(r, "kyb_nif", False) or getattr(r, "kyb_rc", False)) for r in self)
+        ):
+            return {}
+        parent_meth = getattr(super(), "message_track", None)
+        if callable(parent_meth):
+            res = parent_meth(tracked_fields, initial_values)
+            return res if isinstance(res, dict) else {}
+        return {}
+
     @api.constrains("kyb_nif", "vat")
     def _check_duplicate_nif(self):
         """Enforces duplicate NIF governance according to kyb.duplicate_nif_policy."""
@@ -1236,10 +1253,12 @@ class ResPartner(models.Model):
             if not hasattr(partner, "message_post"):
                 continue
             # Flush any pending ORM / precommit field-tracking hooks first so no deferred
-            # tracking message can be created after _post_kyb_audit_log finishes (Odoo 16-20).
+            # tracking message can be created after _post_kyb_audit_log finishes (Odoo 14-20).
             try:
                 if hasattr(self.env, "flush_all"):
                     self.env.flush_all()
+                elif hasattr(self, "flush"):
+                    self.flush()
                 if hasattr(self.env, "cr") and hasattr(self.env.cr, "precommit"):
                     self.env.cr.precommit.run()
             except Exception:
@@ -1253,7 +1272,7 @@ class ResPartner(models.Model):
                 ])
                 for m in all_msgs:
                     b_str = str(m.body or "")
-                    if "Vérification KYB" in b_str:
+                    if "Vérification KYB" in b_str or "KYB Verification" in b_str or "التحقق الجبائي KYB" in b_str:
                         continue
                     if "Doublon" in b_str:
                         # If the partner's current NIF has changed or no longer matches the warning, purge stale warning
@@ -1367,7 +1386,10 @@ class ResPartner(models.Model):
                 existing_cards = self.env["mail.message"].sudo().search([
                     ("model", "=", "res.partner"),
                     ("res_id", "=", partner.id),
+                    "|", "|",
                     ("body", "ilike", "%Vérification KYB%"),
+                    ("body", "ilike", "%KYB Verification%"),
+                    ("body", "ilike", "%التحقق الجبائي KYB%"),
                 ], order="id desc")
             except Exception:
                 existing_cards = []
@@ -1407,11 +1429,12 @@ class ResPartner(models.Model):
                 except Exception:
                     try:
                         if user_partner and "bus.bus" in self.env:
-                            self.env["bus.bus"]._sendone(
-                                user_partner,
-                                "mail.record/insert",
-                                {"Message": {"id": card.id, "body": card.body, "write_date": str(card.write_date)}},
-                            )
+                            bus_model = self.env["bus.bus"]
+                            payload = {"Message": {"id": card.id, "body": card.body, "write_date": str(card.write_date)}}
+                            if hasattr(bus_model, "_sendone"):
+                                bus_model._sendone(user_partner, "mail.record/insert", payload)
+                            elif hasattr(bus_model, "sendone"):
+                                bus_model.sendone((self._cr.dbname, "res.partner", user_partner.id), {"type": "mail.record/insert", "payload": payload})
                     except Exception:
                         pass
             else:
@@ -2646,6 +2669,50 @@ class ResPartner(models.Model):
             if k not in _AUTOCOMPLETE_DATE_EXCLUDE
             and (k in ALWAYS_SYNC_FIELDS or (v is not None and v != ""))
         }
+
+    # ──────────────── Odoo 14.0 & 15.0 Partner Autocomplete Compatibility ────────────────
+
+    @api.model
+    def autocomplete(self, query, timeout=15):
+        """
+        Odoo 14.0 & 15.0 Partner Autocomplete Override:
+        Delegates legacy `res.partner.autocomplete(query)` RPC to `autocomplete_by_name`
+        and maps `partner_gid` / `website` so Odoo 14/15 `_getOdooSuggestions` and `_enrichCompany`
+        display the rich KYB subtitle and trigger full entity enrichment on selection.
+        """
+        res = self.autocomplete_by_name(query, timeout=timeout)
+        for item in res:
+            if isinstance(item, dict):
+                if not item.get("website") and item.get("city"):
+                    item["website"] = item["city"]
+                if not item.get("partner_gid"):
+                    item["partner_gid"] = item.get("duns") or item.get("vat") or item.get("rc_number") or 1
+        return res
+
+    @api.model
+    def read_by_vat(self, vat, timeout=15):
+        """
+        Odoo 14.0 & 15.0 VAT Autocomplete Override:
+        Delegates legacy `res.partner.read_by_vat(vat)` RPC to `autocomplete_by_vat`.
+        """
+        res = self.autocomplete_by_vat(vat, timeout=timeout)
+        for item in res:
+            if isinstance(item, dict):
+                if not item.get("website") and item.get("city"):
+                    item["website"] = item["city"]
+                if not item.get("partner_gid"):
+                    item["partner_gid"] = item.get("duns") or item.get("vat") or 1
+        return res
+
+    @api.model
+    def enrich_company(self, company_domain, partner_gid, vat, timeout=15):
+        """
+        Odoo 14.0 & 15.0 Partner Autocomplete Enrichment Override:
+        Delegates legacy `res.partner.enrich_company(company_domain, partner_gid, vat)` RPC
+        to `enrich_by_duns`.
+        """
+        duns_query = vat or (str(partner_gid) if partner_gid and str(partner_gid) != "1" else "") or company_domain or ""
+        return self.enrich_by_duns(duns_query, timeout=timeout)
 
     @api.model
     def cron_kyb_sync_telemetry(self):

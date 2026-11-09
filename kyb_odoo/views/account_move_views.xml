@@ -100,7 +100,7 @@
         <field name="name">Audit KYB Compliance (Bulk)</field>
         <field name="model_id" ref="account.model_account_move"/>
         <field name="binding_model_id" ref="account.model_account_move"/>
-        <field name="binding_view_types">list,form</field>
+        <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">
             action = records.action_verify_kyb_compliance()

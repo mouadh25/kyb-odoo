@@ -18,11 +18,16 @@ from typing import Optional, Tuple
 
 import requests
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, AccessError
 try:
     from markupsafe import Markup
 except ImportError:
     Markup = lambda s: s
+try:
+    from odoo.tools import html_escape
+except ImportError:
+    import html
+    html_escape = html.escape
 
 _logger = logging.getLogger(__name__)
 
@@ -139,9 +144,9 @@ def _clean_algerian_representant(raw: Optional[str]) -> Optional[str]:
     if not s or s.lower() in ("none", "null", "false", "-", "n/a"):
         return False
 
-    # Strip leading BOAL publication verbs/markers
+    # Strip leading BOAL publication verbs/markers (French and Arabic)
     s = re.sub(
-        r"^(?:d[eé]signer|nommer|nomination\s+(?:de\s+|d['’])?|g[eé]rance\s+(?:par\s+|assur[eé]e\s+par\s+)?|renouvellement\s+(?:de\s+)?|confier\s+la\s+g[eé]rance\s+[aà]\s+|g[eé]rant\s*:?|repr[eé]sentant\s*:?)\s*",
+        r"^(?:d[eé]signer|nommer|nomination\s+(?:de\s+|d['’])?|g[eé]rance\s+(?:par\s+|assur[eé]e\s+par\s+)?|renouvellement\s+(?:de\s+)?|confier\s+la\s+g[eé]rance\s+[aà]\s+|g[eé]rant\s*:?|repr[eé]sentant\s*:?|تعيين|تسمية|مسير\s*:?|مدير\s*:?|المدير\s+العام\s*:?|الممثل\s+القانوني\s*:?)\s*",
         "",
         s,
         flags=re.IGNORECASE,
@@ -244,6 +249,24 @@ ALGERIAN_WILAYAS_69 = {
     "69": "El Abiodh Sidi Cheikh",
 }
 
+ALGERIAN_WILAYAS_ARABIC = {
+    "أدرار": "01", "الشلف": "02", "الأغواط": "03", "أم البواقي": "04",
+    "باتنة": "05", "بجاية": "06", "بسكرة": "07", "بشار": "08",
+    "البليدة": "09", "البويرة": "10", "تمنراست": "11", "تبسة": "12",
+    "تلمسان": "13", "تيارت": "14", "تيزي وزو": "15", "الجزائر": "16",
+    "الجلفة": "17", "جيجل": "18", "سطيف": "19", "سعيدة": "20",
+    "سكيكدة": "21", "سيدي بلعباس": "22", "عنابة": "23", "قالمة": "24",
+    "قسنطينة": "25", "المدية": "26", "مستغانم": "27", "المسيلة": "28",
+    "معسكر": "29", "ورقلة": "30", "وهران": "31", "البيض": "32",
+    "إليزي": "33", "برج بوعريريج": "34", "بومرداس": "35", "الطارف": "36",
+    "تندوف": "37", "تيسمسيلت": "38", "الوادي": "39", "خنشلة": "40",
+    "سوق أهراس": "41", "تيبازة": "42", "ميلة": "43", "عين الدفلى": "44",
+    "النعامة": "45", "عين تموشنت": "46", "غرداية": "47", "غليزان": "48",
+    "تيميمون": "49", "برج باجي مختار": "50", "أولاد جلال": "51", "بني عباس": "52",
+    "عين صالح": "53", "عين قزام": "54", "تقرت": "55", "جانت": "56",
+    "المغير": "57", "المنيعة": "58",
+}
+
 _NORM_WILAYA_TO_CODE = {}
 for code, name in ALGERIAN_WILAYAS_69.items():
     clean_k = re.sub(r"[^a-z0-9]", "", name.lower())
@@ -340,19 +363,27 @@ def _split_algerian_commune_wilaya(raw_str: Optional[str]) -> Tuple[str, str, st
         else:
             raw_wilaya = s
 
-    # Match raw_wilaya to canonical 69 Wilayas
+    # Match raw_wilaya to canonical 69 Wilayas (French and Arabic)
     wilaya_clean = raw_wilaya.strip().title()
     wilaya_code = ""
 
-    m_num = re.match(r"^(\d{1,2})\b", raw_wilaya.strip())
-    if m_num and m_num.group(1).zfill(2) in ALGERIAN_WILAYAS_69:
-        wilaya_code = m_num.group(1).zfill(2)
+    # Check Arabic Wilaya names first
+    clean_ar = re.sub(r"^(?:ولاية|بلدية)\s+", "", raw_wilaya.strip())
+    clean_ar = re.sub(r"[^\u0600-\u06FF\s]", "", clean_ar).strip()
+    if clean_ar in ALGERIAN_WILAYAS_ARABIC:
+        wilaya_code = ALGERIAN_WILAYAS_ARABIC[clean_ar]
         wilaya_clean = ALGERIAN_WILAYAS_69[wilaya_code]
-    else:
-        norm_key = re.sub(r"[^a-z0-9]", "", raw_wilaya.lower())
-        if norm_key in _NORM_WILAYA_TO_CODE:
-            wilaya_code = _NORM_WILAYA_TO_CODE[norm_key]
+
+    if not wilaya_code:
+        m_num = re.match(r"^(\d{1,2})\b", raw_wilaya.strip())
+        if m_num and m_num.group(1).zfill(2) in ALGERIAN_WILAYAS_69:
+            wilaya_code = m_num.group(1).zfill(2)
             wilaya_clean = ALGERIAN_WILAYAS_69[wilaya_code]
+        else:
+            norm_key = re.sub(r"[^a-z0-9]", "", raw_wilaya.lower())
+            if norm_key in _NORM_WILAYA_TO_CODE:
+                wilaya_code = _NORM_WILAYA_TO_CODE[norm_key]
+                wilaya_clean = ALGERIAN_WILAYAS_69[wilaya_code]
 
     # Clean commune
     commune_clean = raw_commune.strip().title()
@@ -581,12 +612,16 @@ def _parse_algerian_address_components(
                     wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
     if raw_nif:
         clean_n = re.sub(r"[^\d]", "", str(raw_nif))
-        if len(clean_n) in (15, 20) and clean_n.startswith("00"):
-            nif_w = clean_n[4:6]
-            if nif_w in ALGERIAN_WILAYAS_69 and wilaya_code != nif_w:
-                if (zip_code and zip_code[:2] == nif_w) or not zip_code:
-                    wilaya_code = nif_w
-                    wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
+        nif_w = ""
+        if len(clean_n) in (15, 20):
+            if clean_n.startswith("00"):
+                nif_w = clean_n[4:6]
+            elif clean_n.startswith("0") and len(clean_n) == 15:
+                nif_w = clean_n[3:5]
+        if nif_w and nif_w in ALGERIAN_WILAYAS_69 and wilaya_code != nif_w:
+            if (zip_code and zip_code[:2] == nif_w) or not zip_code:
+                wilaya_code = nif_w
+                wilaya_name = ALGERIAN_WILAYAS_69[wilaya_code]
 
     return {
         "street": clean_street or False,
@@ -893,8 +928,10 @@ def _get_kyb_client(env):
         _get_config_param(env, "kyb.base_url", default="")
         or _get_config_param(env, "conforme.base_url", default="")
         or "https://kyb.digidevagency.dz"
-    )
-    if "githubusercontent.com" in base_url or "github.com" in base_url:
+    ).strip()
+    import urllib.parse
+    parsed_url = urllib.parse.urlparse(base_url)
+    if parsed_url.scheme not in ("http", "https") or not parsed_url.netloc or "githubusercontent.com" in base_url or "github.com" in base_url:
         base_url = "https://kyb.digidevagency.dz"
         _set_config_param(env, "kyb.base_url", base_url)
 
@@ -1431,44 +1468,57 @@ class ResPartner(models.Model):
 
             rows = []  # Statut row removed — badge in card header already conveys ACTIF/RADIÉ/SUSPENDU
             if partner.name:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; width: 38%; white-space: nowrap; vertical-align: top;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{partner.name}</td></tr>')
+                safe_name = html_escape(str(partner.name))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; width: 38%; white-space: nowrap; vertical-align: top;">{_("Raison Sociale")} :</td><td style="padding: 2px 0; font-weight: 500; color: #18181b;">{safe_name}</td></tr>')
             if partner.kyb_nif:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_nif}</td></tr>')
+                safe_nif = html_escape(str(partner.kyb_nif))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("NIF (Identifiant Fiscal)")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{safe_nif}</td></tr>')
             if partner.kyb_rc:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{partner.kyb_rc}</td></tr>')
+                safe_rc = html_escape(str(partner.kyb_rc))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Numéro RC")} :</td><td style="padding: 2px 0; font-family: monospace; font-weight: 600; color: #18181b;">{safe_rc}</td></tr>')
             if partner.kyb_nis:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nis}</td></tr>')
+                safe_nis = html_escape(str(partner.kyb_nis))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("NIS (Statistique)")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{safe_nis}</td></tr>')
             if partner.kyb_forme_juridique:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_forme_juridique}</td></tr>')
+                safe_forme = html_escape(str(partner.kyb_forme_juridique))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Forme Juridique")} :</td><td style="padding: 2px 0; color: #18181b;">{safe_forme}</td></tr>')
             if partner.kyb_date_creation:
                 label_immat = _("Date d'Immatriculation")
                 d_crea_val = partner.kyb_date_creation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_creation, "strftime") else str(partner.kyb_date_creation)
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{d_crea_val}</td></tr>')
+                safe_d_crea = html_escape(d_crea_val)
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #18181b;">{safe_d_crea}</td></tr>')
             else:
                 # Exact date not published by the registry: show the year encoded in the NIF/RC, labelled as such.
                 deduced = _deduce_algerian_creation_date(nif=partner.kyb_nif, rc=partner.kyb_rc)
                 if deduced:
                     label_immat = _("Date d'Immatriculation")
                     yr_txt = _("Année %s (déduite du NIF — date exacte non publiée)") % deduced[:4]
-                    rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #52525b;">{yr_txt}</td></tr>')
+                    safe_yr = html_escape(yr_txt)
+                    rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #52525b;">{safe_yr}</td></tr>')
             if partner.kyb_date_radiation:
                 d_rad_val = partner.kyb_date_radiation.strftime("%d/%m/%Y") if hasattr(partner.kyb_date_radiation, "strftime") else str(partner.kyb_date_radiation)
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #dc2626;">{d_rad_val}</td></tr>')
+                safe_d_rad = html_escape(d_rad_val)
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Date de Radiation")} :</td><td style="padding: 2px 0; font-weight: 600; color: #dc2626;">{safe_d_rad}</td></tr>')
             if partner.kyb_capital_social:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_capital_social}</td></tr>')
+                safe_cap = html_escape(str(partner.kyb_capital_social))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Capital Social")} :</td><td style="padding: 2px 0; color: #18181b;">{safe_cap}</td></tr>')
             if partner.kyb_representant_legal:
                 clean_rep = _clean_algerian_representant(partner.kyb_representant_legal) or partner.kyb_representant_legal
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{clean_rep}</td></tr>')
+                safe_rep = html_escape(str(clean_rep))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Gérant / Représentant")} :</td><td style="padding: 2px 0; color: #18181b;">{safe_rep}</td></tr>')
             if partner.kyb_activite:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #18181b;">{partner.kyb_activite}</td></tr>')
+                safe_act = html_escape(str(partner.kyb_activite))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activité Principale")} :</td><td style="padding: 2px 0; color: #18181b;">{safe_act}</td></tr>')
             if partner.kyb_nae_codes:
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_nae_codes}</td></tr>')
+                safe_nae = html_escape(str(partner.kyb_nae_codes))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Codes NAE")} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{safe_nae}</td></tr>')
             if partner.kyb_activites_rc:
-                acts_formatted = partner.kyb_activites_rc.replace("\n", "<br/>")
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #3f3f46;">{acts_formatted}</td></tr>')
+                safe_acts = "<br/>".join(html_escape(line) for line in str(partner.kyb_activites_rc).split("\n"))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{_("Activités Secondaires")} :</td><td style="padding: 2px 0; font-size: 11px; color: #3f3f46;">{safe_acts}</td></tr>')
             if partner.kyb_article_imposition:
                 lbl_art = _("Article d'Imposition")
-                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{partner.kyb_article_imposition}</td></tr>')
+                safe_art = html_escape(str(partner.kyb_article_imposition))
+                rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{lbl_art} :</td><td style="padding: 2px 0; font-family: monospace; color: #18181b;">{safe_art}</td></tr>')
 
             rows_html = "".join(rows)
             now_dt = fields.Datetime.now()
@@ -1563,6 +1613,9 @@ class ResPartner(models.Model):
         Sets sovereign verification timestamp, resolves strike-off date if radie,
         and posts an institutional chatter audit entry (Loi 25-11).
         """
+        if hasattr(self.env, "user") and hasattr(self.env.user, "has_group"):
+            if not self.env.user.has_group("base.group_user"):
+                raise AccessError(_("Seuls les utilisateurs internes peuvent exécuter cette action."))
         for partner in self:
             vals = {}
             if not partner.kyb_last_verified:
@@ -1682,6 +1735,9 @@ class ResPartner(models.Model):
     def action_verify_kyb(self):
         """Action button to trigger manual verification from partner form."""
         self.ensure_one()
+        if hasattr(self.env, "user") and hasattr(self.env.user, "has_group"):
+            if not self.env.user.has_group("base.group_user"):
+                raise AccessError(_("Seuls les utilisateurs internes peuvent exécuter la vérification KYB."))
         # If record was just auto-verified during create() within the last 10 seconds and is already complete, avoid redundant billing
         if (
             self.kyb_last_verified

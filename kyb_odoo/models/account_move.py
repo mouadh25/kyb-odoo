@@ -16,6 +16,11 @@ try:
     from markupsafe import Markup
 except ImportError:
     Markup = lambda s: s
+try:
+    from odoo.tools import html_escape
+except ImportError:
+    import html
+    html_escape = html.escape
 
 try:
     from .res_partner import _get_config_param, _get_config_bool
@@ -422,7 +427,8 @@ class AccountMove(models.Model):
             except Exception:
                 pass
 
-            msg_html = (move.kyb_compliance_message or "").replace("\n", "<br/>")
+            safe_msg = html_escape(str(move.kyb_compliance_message or ""))
+            msg_html = safe_msg.replace("\n", "<br/>")
             move.message_post(
                 body=Markup(
                     f"<div class='alert alert-warning'>"
@@ -496,7 +502,8 @@ class AccountMove(models.Model):
                                 }
                             )
                         else:
-                            msg_html = (move.kyb_compliance_message or "").replace("\n", "<br/>")
+                            safe_msg = html_escape(str(move.kyb_compliance_message or ""))
+                            msg_html = safe_msg.replace("\n", "<br/>")
                             move.message_post(
                                 body=Markup(
                                     f"<div class='alert alert-danger'>"

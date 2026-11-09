@@ -170,9 +170,14 @@ def _deduce_algerian_creation_date(nif: Optional[str] = None, rc: Optional[str] 
     """
     if nif:
         clean_nif = re.sub(r"[^\d]", "", str(nif))
-        if len(clean_nif) in (15, 20) and clean_nif.startswith("00"):
-            yy_str = clean_nif[2:4]
-            if yy_str.isdigit():
+        if len(clean_nif) in (15, 20):
+            if clean_nif.startswith("00"):
+                yy_str = clean_nif[2:4]
+            elif clean_nif.startswith("0"):
+                yy_str = clean_nif[1:3]
+            else:
+                yy_str = ""
+            if yy_str and yy_str.isdigit():
                 yy = int(yy_str)
                 full_y = 2000 + yy if yy <= 50 else 1900 + yy
                 return f"{full_y}-01-01"
@@ -251,6 +256,10 @@ for code, name in ALGERIAN_WILAYAS_69.items():
         .replace("â", "a")
     )
     _NORM_WILAYA_TO_CODE[re.sub(r"[^a-z0-9]", "", unaccented)] = code
+
+# In-memory LRU/TTL cache for recent resolve/enrich results: {normalized_key: (timestamp, result_dict)}
+# Used by create() and write() to backfill exact registry dates and prevent redundant billing.
+_KYB_RECENT_RESOLVE_CACHE = {}
 
 def _split_algerian_commune_wilaya(raw_str: Optional[str]) -> Tuple[str, str, str]:
     """
@@ -1057,6 +1066,44 @@ class ResPartner(models.Model):
                         vals["company_registry"] = fmt_rc
             if (vals.get("kyb_nif") or vals.get("kyb_rc")) and vals.get("kyb_statut_cnrc") in ("ACTIF", "RADIE", "SUSPENDU") and not vals.get("kyb_last_verified"):
                 vals["kyb_last_verified"] = fields.Datetime.now()
+
+            # Backfill exact CNRC/DGI dates stripped by _AUTOCOMPLETE_DATE_EXCLUDE during client autocomplete RPC
+            if (vals.get("kyb_nif") or vals.get("kyb_rc")) and (not vals.get("kyb_date_creation") or (vals.get("kyb_statut_cnrc") == "RADIE" and not vals.get("kyb_date_radiation"))):
+                cached_ent = None
+                for cand_key in (vals.get("kyb_nif"), vals.get("kyb_rc"), vals.get("vat"), vals.get("name")):
+                    if not cand_key:
+                        continue
+                    ck = re.sub(r"[\s\-_/.]", "", str(cand_key).strip()).upper()
+                    entry = _KYB_RECENT_RESOLVE_CACHE.get(ck)
+                    if entry and isinstance(entry, tuple) and len(entry) == 2:
+                        prof = entry[1]
+                        if isinstance(prof, dict):
+                            cached_ent = prof.get("entity") or prof.get("data") or prof
+                            if isinstance(cached_ent, dict):
+                                break
+                if not vals.get("kyb_date_creation"):
+                    if isinstance(cached_ent, dict):
+                        dc = _normalize_algerian_date(
+                            cached_ent.get("date_creation")
+                            or cached_ent.get("date_immatriculation")
+                            or cached_ent.get("dateImmatriculation")
+                            or cached_ent.get("dateCreation")
+                        )
+                        if dc:
+                            vals["kyb_date_creation"] = dc
+                    if not vals.get("kyb_date_creation"):
+                        ded = _deduce_algerian_creation_date(nif=vals.get("kyb_nif") or vals.get("vat"), rc=vals.get("kyb_rc"))
+                        if ded:
+                            vals["kyb_date_creation"] = ded
+                if vals.get("kyb_statut_cnrc") == "RADIE" and not vals.get("kyb_date_radiation") and isinstance(cached_ent, dict):
+                    dr = _normalize_algerian_date(
+                        cached_ent.get("date_radiation")
+                        or cached_ent.get("dateRadiation")
+                        or cached_ent.get("radiation_date")
+                        or cached_ent.get("date_rad")
+                    )
+                    if dr:
+                        vals["kyb_date_radiation"] = dr
         # Determine if this batch has KYB-verified records or pending auto-resolve records before creation
         has_kyb = any(
             ((v.get("kyb_nif") or v.get("kyb_rc")) and v.get("kyb_statut_cnrc")) or (i in raw_queries_by_idx)
@@ -1092,10 +1139,14 @@ class ResPartner(models.Model):
         if "kyb_rc" in vals or "company_registry" in vals:
             rc_in = vals.get("kyb_rc") or vals.get("company_registry")
             if rc_in:
-                fmt_rc = format_official_rc(rc_in) or rc_in
+                fmt_rc = format_official_rc(rc_in, vals.get("kyb_date_creation")) or rc_in
                 vals["kyb_rc"] = fmt_rc
                 if "company_registry" in self._fields:
                     vals["company_registry"] = fmt_rc
+        if not vals.get("kyb_date_creation") and (vals.get("kyb_nif") or vals.get("kyb_rc") or vals.get("vat")):
+            ded = _deduce_algerian_creation_date(nif=vals.get("kyb_nif") or vals.get("vat"), rc=vals.get("kyb_rc"))
+            if ded:
+                vals["kyb_date_creation"] = ded
         # Suppress ORM field-diff tracking chatter when saving KYB-enriched fields or updating company identity
         kyb_write_keys = {
             "kyb_nif", "kyb_rc", "kyb_nis", "kyb_statut_cnrc",
@@ -2478,6 +2529,27 @@ class ResPartner(models.Model):
             else:
                 return {}
 
+        # Cache resolved/enriched entity in _KYB_RECENT_RESOLVE_CACHE so subsequent create()/write()
+        # or onchange calls hit 0ms in-memory cache with 0 credits and preserve exact registry dates.
+        try:
+            import time as _time
+            now_ts = _time.time()
+            for ck_raw in (
+                data.get("nif"),
+                data.get("rc_number"),
+                data.get("rc_number_official"),
+                candidate_ctx.get("vat"),
+                candidate_ctx.get("rc_number"),
+                candidate_ctx.get("rc_official"),
+                clean_duns,
+            ):
+                if ck_raw:
+                    ck_norm = re.sub(r"[\s\-_/.]", "", str(ck_raw).strip()).upper()
+                    if ck_norm:
+                        _KYB_RECENT_RESOLVE_CACHE[ck_norm] = (now_ts, {"entity": data})
+        except Exception:
+            pass
+
         dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
         dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False
 
@@ -2569,8 +2641,12 @@ class ResPartner(models.Model):
         rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or candidate_ctx.get("rc_official") or ""
         rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or candidate_ctx.get("rc_number") or ""
         date_crea_val = _normalize_algerian_date(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))
+        if not date_crea_val:
+            date_crea_val = _deduce_algerian_creation_date(nif=nif_candidate, rc=rc_official or rc_raw or candidate_ctx.get("rc_official") or candidate_ctx.get("rc_number"))
         fallback_y = date_crea_val or (nif_candidate[2:4] if nif_candidate and len(nif_candidate) in (15, 20) and nif_candidate.isdigit() else None)
         rc_val = format_official_rc(rc_official or rc_raw, fallback_y, addr_parsed["wilaya_code"]) or rc_official or rc_raw
+        if not date_crea_val and rc_val:
+            date_crea_val = _deduce_algerian_creation_date(rc=rc_val)
         forme_val = data.get("forme_juridique") or data.get("formeJuridique") or ""
 
         is_pm = False
@@ -2660,10 +2736,16 @@ class ResPartner(models.Model):
             "kyb_statut_cnrc", "kyb_activite",
             "kyb_nae_codes", "kyb_activites_rc", "street", "street2", "city", "zip", "country_id", "state_id",
             "is_company", "company_type", "kyb_forme_juridique", "kyb_capital_social",
-            "kyb_representant_legal", "company_registry"
+            "kyb_representant_legal", "company_registry", "kyb_date_creation", "kyb_date_radiation"
         }
-        # Explicitly block date fields regardless of value to avoid the Luxon crash.
-        _AUTOCOMPLETE_DATE_EXCLUDE = {"kyb_date_creation", "kyb_date_radiation"}
+        # In Odoo 14.0, 15.0, 16.0: web client accepts standard ISO strings (YYYY-MM-DD) for Date fields.
+        # In Odoo 17+: OWL 2 uses Luxon DateTime for Date fields, so raw strings crash serializeDate().
+        try:
+            import odoo.release
+            is_legacy_web = getattr(odoo.release, "version_info", (14,))[0] < 17
+        except Exception:
+            is_legacy_web = False
+        _AUTOCOMPLETE_DATE_EXCLUDE = set() if is_legacy_web else {"kyb_date_creation", "kyb_date_radiation"}
         return {
             k: v for k, v in enrich_dict.items()
             if k not in _AUTOCOMPLETE_DATE_EXCLUDE

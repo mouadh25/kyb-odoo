@@ -43,13 +43,83 @@ msgid "KYB Settings"
 msgstr ""
 
 #. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_settings
+msgid "Settings"
+msgstr ""
+
+#. module: kyb_odoo
 #: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
 msgid "KYB Verification"
 msgstr ""
 
 #. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB Corporate Identity & Fiscal Verification"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB (by Digidev) Credentials"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Configure your KYB secret API key (hosted locally on Algérie Télécom Cloud)."
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "CNRC Autocomplete"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Replaces international company search with the National Trade Registry via KYB."
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Allow Worldwide Fallback Search"
+msgstr ""
+
+#. module: kyb_odoo
 #: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
 msgid "Verify KYB"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "KYB — Fiscal Verification"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "KYB Sovereign Verification"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Vérifiez l'identité fiscale et le statut CNRC en temps réel."
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Fiscal Identification"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Registry Details"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Dominant Primary Activity"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Secondary RC Activities (CNRC)"
 msgstr ""
 
 #. module: kyb_odoo
@@ -125,6 +195,11 @@ msgstr ""
 #. module: kyb_odoo
 #: model:ir.actions.server,name:kyb_odoo.action_bulk_verify_kyb_compliance
 msgid "Audit KYB Compliance (Bulk)"
+msgstr ""
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_move_form_kyb
+msgid "KYB Fiscal Alert: Deduction Rejection Risk"
 msgstr ""
 
 #. module: kyb_odoo

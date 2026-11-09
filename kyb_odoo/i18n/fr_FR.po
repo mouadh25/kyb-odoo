@@ -44,14 +44,84 @@ msgid "KYB Settings"
 msgstr "Paramètres KYB"
 
 #. module: kyb_odoo
+#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_settings
+msgid "Settings"
+msgstr "Paramètres"
+
+#. module: kyb_odoo
 #: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
 msgid "KYB Verification"
 msgstr "Vérification KYB"
 
 #. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB Corporate Identity & Fiscal Verification"
+msgstr "Vérification Fiscale & Identité des Entreprises KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "KYB (by Digidev) Credentials"
+msgstr "Identifiants KYB (par Digidev)"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Configure your KYB secret API key (hosted locally on Algérie Télécom Cloud)."
+msgstr "Configurez votre clé secrète KYB (hébergée localement sur le Cloud Algérie Télécom)."
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "CNRC Autocomplete"
+msgstr "Saisie Automatique CNRC"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Replaces international company search with the National Trade Registry via KYB."
+msgstr "Remplace la recherche d'entreprises internationale par le Registre National du Commerce via KYB."
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.res_config_settings_view_form_kyb
+msgid "Allow Worldwide Fallback Search"
+msgstr "Autoriser la recherche internationale de secours (Search Worldwide)"
+
+#. module: kyb_odoo
 #: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
 msgid "Verify KYB"
 msgstr "Vérifier Fiche KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "KYB — Fiscal Verification"
+msgstr "KYB — Vérification Fiscale"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "KYB Sovereign Verification"
+msgstr "Vérification Fiscale KYB"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Vérifiez l'identité fiscale et le statut CNRC en temps réel."
+msgstr "Vérifiez l'identité fiscale et le statut CNRC en temps réel."
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Fiscal Identification"
+msgstr "Identification Fiscale"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Registry Details"
+msgstr "Détails Registre"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Dominant Primary Activity"
+msgstr "Activité Principale Dominante"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_partner_form_kyb
+msgid "Secondary RC Activities (CNRC)"
+msgstr "Activités Secondaires RC (CNRC)"
 
 #. module: kyb_odoo
 #: model:ir.model.fields,field_description:kyb_odoo.field_res_partner__kyb_nif
@@ -127,6 +197,11 @@ msgstr "Audit Conformité KYB"
 #: model:ir.actions.server,name:kyb_odoo.action_bulk_verify_kyb_compliance
 msgid "Audit KYB Compliance (Bulk)"
 msgstr "Audit de Conformité KYB (En masse)"
+
+#. module: kyb_odoo
+#: model_terms:ir.ui.view,arch_db:kyb_odoo.view_move_form_kyb
+msgid "KYB Registry Alert: Deregistered Supplier"
+msgstr "Alerte Registre KYB : Fournisseur Radié (Art. 176 CIDTA)"
 
 #. module: kyb_odoo
 #: model:ir.model.fields,field_description:kyb_odoo.field_account_move__kyb_compliance_status
@@ -236,3 +311,4 @@ msgstr "Audit de Masse KYB Terminé"
 #: model:ir.model.fields,field_description:kyb_odoo.field_res_config_settings__kyb_customer_invoice_policy
 msgid "Politique Factures Clients (Ventes / État 104)"
 msgstr "Politique Factures Clients (Ventes / État 104)"
+

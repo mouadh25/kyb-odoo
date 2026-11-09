@@ -1,4 +1,4 @@
-/* KYB Enterprise Partner Autocomplete - Far-Right Discrete Badges */
+/* KYB Enterprise Partner Autocomplete - Far-Right Discrete Badges (Odoo 16-20 OWL & Odoo 14-15 Legacy) */
 .o-autocomplete--dropdown-menu .ui-menu-item > a.ui-menu-item-wrapper {
     display: flex !important;
     align-items: center !important;
@@ -12,4 +12,37 @@
     align-items: center !important;
     justify-content: space-between !important;
     width: 100% !important;
+}
+
+/* Odoo 14 & 15 Legacy Bootstrap Dropdown Layout */
+.o_field_partner_autocomplete.dropdown > .o_partner_autocomplete_dropdown .dropdown-item.o_partner_autocomplete_suggestion {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    min-width: 440px !important;
+    padding: 6px 12px !important;
+    gap: 10px !important;
+}
+
+.o_field_partner_autocomplete.dropdown > .o_partner_autocomplete_dropdown .dropdown-item.o_partner_autocomplete_suggestion > img {
+    float: none !important;
+    width: 32px !important;
+    height: 32px !important;
+    flex-shrink: 0 !important;
+    border-radius: 4px !important;
+}
+
+.o_field_partner_autocomplete.dropdown > .o_partner_autocomplete_dropdown .dropdown-item.o_partner_autocomplete_suggestion > .o_partner_autocomplete_info {
+    margin-left: 0 !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+.o_field_partner_autocomplete.dropdown > .o_partner_autocomplete_dropdown .dropdown-item.o_partner_autocomplete_suggestion > .o_partner_autocomplete_info > div {
+    font-size: 12px !important;
+    opacity: 0.85 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }

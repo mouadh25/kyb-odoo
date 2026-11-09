@@ -257,9 +257,51 @@ for code, name in ALGERIAN_WILAYAS_69.items():
     )
     _NORM_WILAYA_TO_CODE[re.sub(r"[^a-z0-9]", "", unaccented)] = code
 
-# In-memory LRU/TTL cache for recent resolve/enrich results: {normalized_key: (timestamp, result_dict)}
+# Bounded LRU/TTL cache for recent resolve/enrich results: {normalized_key: (timestamp, result_dict)}
+# Prevents memory leakage by enforcing max capacity (500 entries) and 30-minute TTL.
 # Used by create() and write() to backfill exact registry dates and prevent redundant billing.
+_KYB_RECENT_CACHE_MAX_SIZE = 500
+_KYB_RECENT_CACHE_TTL_SEC = 1800  # 30 minutes
 _KYB_RECENT_RESOLVE_CACHE = {}
+
+def _cache_put_resolved_entity(key: str, entity_data: dict) -> None:
+    """Thread-safe bounded insertion with automatic TTL & LRU eviction."""
+    if not key or not isinstance(entity_data, dict):
+        return
+    import time as _t
+    now_ts = _t.time()
+    try:
+        # 1. Prune expired entries if over 80% capacity
+        if len(_KYB_RECENT_RESOLVE_CACHE) >= int(_KYB_RECENT_CACHE_MAX_SIZE * 0.8):
+            cutoff = now_ts - _KYB_RECENT_CACHE_TTL_SEC
+            expired = [k for k, v in _KYB_RECENT_RESOLVE_CACHE.items() if isinstance(v, tuple) and len(v) == 2 and v[0] < cutoff]
+            for k in expired:
+                _KYB_RECENT_RESOLVE_CACHE.pop(k, None)
+        # 2. If still at/over capacity, evict oldest 20%
+        if len(_KYB_RECENT_RESOLVE_CACHE) >= _KYB_RECENT_CACHE_MAX_SIZE:
+            oldest = sorted(_KYB_RECENT_RESOLVE_CACHE.keys(), key=lambda k: _KYB_RECENT_RESOLVE_CACHE[k][0] if isinstance(_KYB_RECENT_RESOLVE_CACHE[k], tuple) else 0)[:100]
+            for k in oldest:
+                _KYB_RECENT_RESOLVE_CACHE.pop(k, None)
+        _KYB_RECENT_RESOLVE_CACHE[key] = (now_ts, entity_data)
+    except Exception as e:
+        _logger.debug("[KYB Cache] Bounded insert ignored error: %s", e)
+
+def _cache_get_resolved_entity(key: str) -> Optional[dict]:
+    """Retrieves cached entity if within TTL; evicts stale entry otherwise."""
+    if not key:
+        return None
+    import time as _t
+    try:
+        entry = _KYB_RECENT_RESOLVE_CACHE.get(key)
+        if entry and isinstance(entry, tuple) and len(entry) == 2:
+            ts, data = entry
+            if _t.time() - ts <= _KYB_RECENT_CACHE_TTL_SEC:
+                return data
+            else:
+                _KYB_RECENT_RESOLVE_CACHE.pop(key, None)
+    except Exception as e:
+        _logger.debug("[KYB Cache] Retrieval ignored error: %s", e)
+    return None
 
 def _split_algerian_commune_wilaya(raw_str: Optional[str]) -> Tuple[str, str, str]:
     """
@@ -1074,13 +1116,11 @@ class ResPartner(models.Model):
                     if not cand_key:
                         continue
                     ck = re.sub(r"[\s\-_/.]", "", str(cand_key).strip()).upper()
-                    entry = _KYB_RECENT_RESOLVE_CACHE.get(ck)
-                    if entry and isinstance(entry, tuple) and len(entry) == 2:
-                        prof = entry[1]
-                        if isinstance(prof, dict):
-                            cached_ent = prof.get("entity") or prof.get("data") or prof
-                            if isinstance(cached_ent, dict):
-                                break
+                    prof = _cache_get_resolved_entity(ck)
+                    if isinstance(prof, dict):
+                        cached_ent = prof.get("entity") or prof.get("data") or prof
+                        if isinstance(cached_ent, dict):
+                            break
                 if not vals.get("kyb_date_creation"):
                     if isinstance(cached_ent, dict):
                         dc = _normalize_algerian_date(
@@ -1143,10 +1183,30 @@ class ResPartner(models.Model):
                 vals["kyb_rc"] = fmt_rc
                 if "company_registry" in self._fields:
                     vals["company_registry"] = fmt_rc
-        if not vals.get("kyb_date_creation") and (vals.get("kyb_nif") or vals.get("kyb_rc") or vals.get("vat")):
-            ded = _deduce_algerian_creation_date(nif=vals.get("kyb_nif") or vals.get("vat"), rc=vals.get("kyb_rc"))
-            if ded:
-                vals["kyb_date_creation"] = ded
+        if not vals.get("kyb_date_creation") and not any(bool(r.kyb_date_creation) for r in self) and (vals.get("kyb_nif") or vals.get("kyb_rc") or vals.get("vat")):
+            cached_dc = None
+            for cand_key in (vals.get("kyb_nif"), vals.get("kyb_rc"), vals.get("vat"), vals.get("name")):
+                if not cand_key:
+                    continue
+                ck = re.sub(r"[\s\-_/.]", "", str(cand_key).strip()).upper()
+                prof = _cache_get_resolved_entity(ck)
+                if isinstance(prof, dict):
+                    ent = prof.get("entity") or prof.get("data") or prof
+                    if isinstance(ent, dict):
+                        cached_dc = _normalize_algerian_date(
+                            ent.get("date_creation")
+                            or ent.get("date_immatriculation")
+                            or ent.get("dateImmatriculation")
+                            or ent.get("dateCreation")
+                        )
+                        if cached_dc:
+                            break
+            if cached_dc:
+                vals["kyb_date_creation"] = cached_dc
+            else:
+                ded = _deduce_algerian_creation_date(nif=vals.get("kyb_nif") or vals.get("vat"), rc=vals.get("kyb_rc"))
+                if ded:
+                    vals["kyb_date_creation"] = ded
         # Suppress ORM field-diff tracking chatter when saving KYB-enriched fields or updating company identity
         kyb_write_keys = {
             "kyb_nif", "kyb_rc", "kyb_nis", "kyb_statut_cnrc",
@@ -2529,11 +2589,9 @@ class ResPartner(models.Model):
             else:
                 return {}
 
-        # Cache resolved/enriched entity in _KYB_RECENT_RESOLVE_CACHE so subsequent create()/write()
+        # Cache resolved/enriched entity in bounded TTL cache so subsequent create()/write()
         # or onchange calls hit 0ms in-memory cache with 0 credits and preserve exact registry dates.
         try:
-            import time as _time
-            now_ts = _time.time()
             for ck_raw in (
                 data.get("nif"),
                 data.get("rc_number"),
@@ -2546,9 +2604,9 @@ class ResPartner(models.Model):
                 if ck_raw:
                     ck_norm = re.sub(r"[\s\-_/.]", "", str(ck_raw).strip()).upper()
                     if ck_norm:
-                        _KYB_RECENT_RESOLVE_CACHE[ck_norm] = (now_ts, {"entity": data})
-        except Exception:
-            pass
+                        _cache_put_resolved_entity(ck_norm, {"entity": data})
+        except Exception as e:
+            _logger.debug("[KYB Cache] Error in enrich_by_duns caching: %s", e)
 
         dz_country = self.env.ref("base.dz", raise_if_not_found=False) or self.env["res.country"].search([("code", "=", "DZ")], limit=1)
         dz_country_dict = {"id": dz_country.id, "display_name": dz_country.display_name or dz_country.name} if dz_country else False

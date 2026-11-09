@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="assets_backend" name="kyb_odoo assets" inherit_id="web.assets_backend">
+        <xpath expr="." position="inside">
+            <link rel="stylesheet" type="text/css" href="/kyb_odoo/static/src/css/partner_autocomplete.css"/>
+            <script type="text/javascript" src="/kyb_odoo/static/src/js/partner_autocomplete.js"/>
+        </xpath>
+    </template>
+</odoo>

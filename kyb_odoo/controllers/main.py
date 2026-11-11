@@ -54,8 +54,8 @@ class KybWebhookController(http.Controller):
     @http.route("/kyb/webhook", type=_ROUTE_TYPE, auth="public", methods=["POST"], csrf=False)
     def receive_webhook(self, **kwargs):
         """
-        Inbound Webhook Receiver for Conforme Proactive Alerts (Loi 25-11):
-        Accepts push notifications from Conforme background workers.
+        Inbound Webhook Receiver for KYB Proactive Alerts (Loi 25-11):
+        Accepts push notifications from KYB background workers.
         Updates partner status and re-audits open vendor bills.
         """
         configured_key = _get_config_param(request.env, "kyb.api_key", default="")

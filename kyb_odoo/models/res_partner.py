@@ -8,7 +8,7 @@ This module extends ``res.partner`` with:
        when a NIF or RC is entered.
     3. A ``_name_search`` override that queries the KYB fuzzy search endpoint
        for real-time autocomplete in many2one partner selector fields.
-    4. Resilient multi-runtime support: seamlessly uses the official ``conforme`` SDK if installed,
+    4. Resilient multi-runtime support: seamlessly uses the official ``kyb`` SDK if installed,
        or falls back to native Python ``requests`` with zero external package requirements.
 """
 

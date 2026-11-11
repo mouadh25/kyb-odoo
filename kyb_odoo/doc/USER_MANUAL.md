@@ -2,7 +2,7 @@
 **Version :** `2.0.8` / `20.0.2.0.8`  
 **Cible :** Directeurs Financiers (DAF), Responsables Comptables, Gestionnaires Achats & Ventes  
 **Portail KYB (by Digidev) :** [kyb.digidevagency.dz](https://kyb.digidevagency.dz)  
-**Compatibilité :** Odoo 16.0 LTS, 17.0, 18.0, 19.0, 20.0 (Community & Enterprise)
+**Compatibilité :** Odoo 14.0 LTS, 15.0 LTS, 16.0 LTS, 17.0, 18.0, 19.0, 20.0 (Community & Enterprise)
 
 ---
 

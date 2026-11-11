@@ -14,6 +14,18 @@
     width: 100% !important;
 }
 
+/* Sovereign Invariant (Loi 25-11): Hide native Search Worldwide item unless explicitly enabled in KYB settings */
+.o-autocomplete--dropdown-item:has(> a.text-info),
+.o_partner_autocomplete_dropdown .dropdown-item:has(> a.text-info),
+.ui-menu-item:has(> a.text-info) {
+    display: none !important;
+}
+body.kyb-worldwide-enabled .o-autocomplete--dropdown-item:has(> a.text-info),
+body.kyb-worldwide-enabled .o_partner_autocomplete_dropdown .dropdown-item:has(> a.text-info),
+body.kyb-worldwide-enabled .ui-menu-item:has(> a.text-info) {
+    display: block !important;
+}
+
 /* Odoo 14 & 15 Legacy Bootstrap Dropdown Layout */
 .o_field_partner_autocomplete.dropdown > .o_partner_autocomplete_dropdown .dropdown-item.o_partner_autocomplete_suggestion {
     display: flex !important;

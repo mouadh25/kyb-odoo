@@ -169,9 +169,10 @@ def _clean_algerian_representant(raw: Optional[str]) -> Optional[str]:
 
 def _deduce_algerian_creation_date(nif: Optional[str] = None, rc: Optional[str] = None) -> Optional[str]:
     """
-    Deterministically deduces the creation/immatriculation date ('YYYY-01-01')
-    from Algerian corporate NIF (00YYWWXXXXXXXCC -> 20YY-01-01) or official RC.
-    Guarantees 'Date d'Immatriculation' is never empty when year is known from identifiers.
+    Deterministically deduces the creation/immatriculation year ('YYYY')
+    from Algerian corporate NIF (00YYWWXXXXXXXCC -> 20YY / 19YY) or official RC.
+    Returns 4-digit string 'YYYY' or False.
+    INVARIANT: Never returns a fabricated 'YYYY-01-01' date.
     """
     if nif:
         clean_nif = re.sub(r"[^\d]", "", str(nif))
@@ -185,19 +186,19 @@ def _deduce_algerian_creation_date(nif: Optional[str] = None, rc: Optional[str] 
             if yy_str and yy_str.isdigit():
                 yy = int(yy_str)
                 full_y = 2000 + yy if yy <= 50 else 1900 + yy
-                return f"{full_y}-01-01"
+                return str(full_y)
     if rc:
         clean_rc = str(rc).strip()
         m_official = re.search(r"[ABCDabcd](\d{2})$", clean_rc)
         if m_official:
             yy = int(m_official.group(1))
             full_y = 2000 + yy if yy <= 50 else 1900 + yy
-            return f"{full_y}-01-01"
+            return str(full_y)
         m_comp = re.match(r"^(\d{2})[ABCDabcd]", clean_rc)
         if m_comp:
             yy = int(m_comp.group(1))
             full_y = 2000 + yy if yy <= 50 else 1900 + yy
-            return f"{full_y}-01-01"
+            return str(full_y)
     return False
 
 def _normalize_algerian_date(val: Optional[any]) -> Optional[str]:
@@ -220,9 +221,7 @@ def _normalize_algerian_date(val: Optional[any]) -> Optional[str]:
     if m_fr:
         d, m, y = m_fr.group(1).zfill(2), m_fr.group(2).zfill(2), m_fr.group(3)
         return f"{y}-{m}-{d}"
-    m_year = re.match(r"^(\d{4})$", s)
-    if m_year:
-        return f"{m_year.group(1)}-01-01"
+    # A bare year (e.g. "1999") is NOT a date: never fabricate YYYY-01-01 (Statutory invariant 2).
     return False
  
  
@@ -1168,10 +1167,7 @@ class ResPartner(models.Model):
                         )
                         if dc:
                             vals["kyb_date_creation"] = dc
-                    if not vals.get("kyb_date_creation"):
-                        ded = _deduce_algerian_creation_date(nif=vals.get("kyb_nif") or vals.get("vat"), rc=vals.get("kyb_rc"))
-                        if ded:
-                            vals["kyb_date_creation"] = ded
+                    # No exact date => field stays empty; the Chatter card states the creation year (never a fake 01/01).
                 if vals.get("kyb_statut_cnrc") == "RADIE" and not vals.get("kyb_date_radiation") and isinstance(cached_ent, dict):
                     dr = _normalize_algerian_date(
                         cached_ent.get("date_radiation")
@@ -1181,6 +1177,26 @@ class ResPartner(models.Model):
                     )
                     if dr:
                         vals["kyb_date_radiation"] = dr
+
+            # Enforce Décret 05-468 statutory classification: Personne Physique (PP) vs Personne Morale (PM)
+            v_rc = str(vals.get("kyb_rc") or vals.get("company_registry") or "")
+            v_forme = str(vals.get("kyb_forme_juridique") or "")
+            v_nif = re.sub(r"[\s\-_/.]", "", str(vals.get("kyb_nif") or vals.get("vat") or "")).strip()
+            if (
+                "PHYSIQUE" in v_forme.upper()
+                or (v_rc and re.search(r'[0-9]+[AC][0-9]+', v_rc, re.IGNORECASE))
+                or (v_nif and len(v_nif) in (15, 20) and v_nif[0] in ('1', '2'))
+            ):
+                vals["is_company"] = False
+                if "company_type" in self._fields:
+                    vals["company_type"] = "person"
+            elif (
+                (v_rc and re.search(r'[0-9]+[B][0-9]+', v_rc, re.IGNORECASE))
+                or any(f in v_forme.upper() for f in ("SARL", "EURL", "SPA", "SNC", "SCS", "SCA", "GIE", "EPE", "MORALE"))
+            ):
+                vals["is_company"] = True
+                if "company_type" in self._fields:
+                    vals["company_type"] = "company"
         # Determine if this batch has KYB-verified records or pending auto-resolve records before creation
         has_kyb = any(
             ((v.get("kyb_nif") or v.get("kyb_rc")) and v.get("kyb_statut_cnrc")) or (i in raw_queries_by_idx)
@@ -1220,8 +1236,9 @@ class ResPartner(models.Model):
                 vals["kyb_rc"] = fmt_rc
                 if "company_registry" in self._fields:
                     vals["company_registry"] = fmt_rc
-        if not vals.get("kyb_date_creation") and not any(bool(r.kyb_date_creation) for r in self) and (vals.get("kyb_nif") or vals.get("kyb_rc") or vals.get("vat")):
+        if (not vals.get("kyb_date_creation") or (vals.get("kyb_statut_cnrc") == "RADIE" and not vals.get("kyb_date_radiation"))) and (vals.get("kyb_nif") or vals.get("kyb_rc") or vals.get("vat")):
             cached_dc = None
+            cached_dr = None
             for cand_key in (vals.get("kyb_nif"), vals.get("kyb_rc"), vals.get("vat"), vals.get("name")):
                 if not cand_key:
                     continue
@@ -1230,20 +1247,43 @@ class ResPartner(models.Model):
                 if isinstance(prof, dict):
                     ent = prof.get("entity") or prof.get("data") or prof
                     if isinstance(ent, dict):
-                        cached_dc = _normalize_algerian_date(
-                            ent.get("date_creation")
-                            or ent.get("date_immatriculation")
-                            or ent.get("dateImmatriculation")
-                            or ent.get("dateCreation")
-                        )
-                        if cached_dc:
+                        if not vals.get("kyb_date_creation") and not cached_dc:
+                            cached_dc = _normalize_algerian_date(
+                                ent.get("date_creation")
+                                or ent.get("date_immatriculation")
+                                or ent.get("dateImmatriculation")
+                                or ent.get("dateCreation")
+                            )
+                        if (vals.get("kyb_statut_cnrc") == "RADIE" or any(r.kyb_statut_cnrc == "RADIE" for r in self)) and not vals.get("kyb_date_radiation") and not cached_dr:
+                            cached_dr = _normalize_algerian_date(
+                                ent.get("date_radiation")
+                                or ent.get("dateRadiation")
+                                or ent.get("radiation_date")
+                                or ent.get("date_rad")
+                            )
+                        if cached_dc and (cached_dr or vals.get("kyb_statut_cnrc") != "RADIE"):
                             break
-            if cached_dc:
+            if cached_dc and not vals.get("kyb_date_creation") and not any(bool(r.kyb_date_creation) for r in self):
                 vals["kyb_date_creation"] = cached_dc
-            else:
-                ded = _deduce_algerian_creation_date(nif=vals.get("kyb_nif") or vals.get("vat"), rc=vals.get("kyb_rc"))
-                if ded:
-                    vals["kyb_date_creation"] = ded
+            if cached_dr and not vals.get("kyb_date_radiation") and not any(bool(r.kyb_date_radiation) for r in self):
+                vals["kyb_date_radiation"] = cached_dr
+            # else: leave empty (no fabricated YYYY-01-01).
+
+        # Enforce Décret 05-468 statutory classification: Personne Physique (PP) vs Personne Morale (PM)
+        if vals.get("is_company") is True:
+            for rec in self:
+                rec_rc = str(vals.get("kyb_rc") or rec.kyb_rc or getattr(rec, "company_registry", "") or "")
+                rec_forme = str(vals.get("kyb_forme_juridique") or rec.kyb_forme_juridique or "")
+                rec_nif = re.sub(r"[\s\-_/.]", "", str(vals.get("kyb_nif") or vals.get("vat") or rec.kyb_nif or rec.vat or "")).strip()
+                if (
+                    "PHYSIQUE" in rec_forme.upper()
+                    or (rec_rc and re.search(r'[0-9]+[AC][0-9]+', rec_rc, re.IGNORECASE))
+                    or (rec_nif and len(rec_nif) in (15, 20) and rec_nif[0] in ('1', '2'))
+                ):
+                    vals["is_company"] = False
+                    if "company_type" in self._fields:
+                        vals["company_type"] = "person"
+                    break
         # Suppress ORM field-diff tracking chatter when saving KYB-enriched fields or updating company identity
         kyb_write_keys = {
             "kyb_nif", "kyb_rc", "kyb_nis", "kyb_statut_cnrc",
@@ -1400,6 +1440,21 @@ class ResPartner(models.Model):
         for partner in self:
             if not hasattr(partner, "message_post"):
                 continue
+
+            # Personne Physique statutory classification (Décret 05-468 Art. 3 & Loi 22-23)
+            p_rc = str(partner.kyb_rc or getattr(partner, "company_registry", "") or "")
+            p_forme = str(partner.kyb_forme_juridique or "")
+            p_nif = re.sub(r"[\s\-_/.]", "", str(partner.kyb_nif or partner.vat or "")).strip()
+            is_pp_partner = (
+                "PHYSIQUE" in p_forme.upper()
+                or (p_rc and re.search(r'[0-9]+[AC][0-9]+', p_rc, re.IGNORECASE))
+                or (p_nif and len(p_nif) in (15, 20) and p_nif[0] in ('1', '2'))
+            )
+            if is_pp_partner and partner.is_company:
+                partner.with_context(tracking_disable=True, mail_notrack=True, kyb_skip_audit_post=True).write({"is_company": False})
+            elif not is_pp_partner and (p_rc and re.search(r'[0-9]+[B][0-9]+', p_rc, re.IGNORECASE)) and not partner.is_company:
+                partner.with_context(tracking_disable=True, mail_notrack=True, kyb_skip_audit_post=True).write({"is_company": True})
+
             # Flush any pending ORM / precommit field-tracking hooks first so no deferred
             # tracking message can be created after _post_kyb_audit_log finishes (Odoo 14-20).
             try:
@@ -1492,7 +1547,7 @@ class ResPartner(models.Model):
                 deduced = _deduce_algerian_creation_date(nif=partner.kyb_nif, rc=partner.kyb_rc)
                 if deduced:
                     label_immat = _("Date d'Immatriculation")
-                    yr_txt = _("Année %s (déduite du NIF — date exacte non publiée)") % deduced[:4]
+                    yr_txt = _("Date non disponible au registre officiel (création : %s)") % deduced[:4]
                     safe_yr = html_escape(yr_txt)
                     rows.append(f'<tr><td style="padding: 2px 10px 2px 0; color: #71717a; white-space: nowrap; vertical-align: top;">{label_immat} :</td><td style="padding: 2px 0; color: #52525b;">{safe_yr}</td></tr>')
             if partner.kyb_date_radiation:
@@ -1522,6 +1577,13 @@ class ResPartner(models.Model):
 
             rows_html = "".join(rows)
             now_dt = fields.Datetime.now()
+            # Render in the user's configured timezone (Africa/Algiers fallback), never raw UTC.
+            try:
+                import pytz
+                user_tz = getattr(getattr(self.env, "user", None), "tz", None) or (getattr(self.env, "context", None) or {}).get("tz") or "Africa/Algiers"
+                now_dt = pytz.utc.localize(now_dt).astimezone(pytz.timezone(user_tz)) if hasattr(now_dt, "tzinfo") and now_dt.tzinfo is None else now_dt
+            except Exception:
+                pass
             now_str = now_dt.strftime("%d/%m/%Y %H:%M") if hasattr(now_dt, "strftime") else str(now_dt or "")
             body = (
                 f'<div style="background-color: {card_bg} !important; border: 1px solid {card_border} !important; border-radius: 8px !important; padding: 12px 14px !important; margin: 4px 0 !important; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">'
@@ -1651,16 +1713,8 @@ class ResPartner(models.Model):
                             vals["kyb_date_creation"] = norm_crea
                     except Exception:
                         pass
-                # Fallback: derive registration year from RC if exact date is still missing
-                if not vals.get("kyb_date_creation") and partner.kyb_rc:
-                    rc_clean = re.sub(r"\s+", "", str(partner.kyb_rc or ""))
-                    m_suf = re.search(r"[A-Za-z](\d{2})$", rc_clean)
-                    m_pref = re.match(r"^(\d{2})[A-Za-z]\d{4,8}$", rc_clean)
-                    yr_2d = m_suf.group(1) if m_suf else (m_pref.group(1) if m_pref else None)
-                    if yr_2d:
-                        yr_full = int(yr_2d)
-                        yr_4d = 1900 + yr_full if yr_full >= 50 else 2000 + yr_full
-                        vals["kyb_date_creation"] = f"{yr_4d}-01-01"
+                # No exact date available: leave the field empty. The Chatter card states the
+                # creation year derived from the identifiers, never a fabricated YYYY-01-01.
 
             # 2. Sync Status and Date de Radiation
             incoming_statut = (data.get("statut_cnrc") or data.get("statutCnrc") or data.get("statut") or "") if isinstance(data, dict) else ""
@@ -2245,7 +2299,7 @@ class ResPartner(models.Model):
                     "kyb_activites_rc": self.kyb_activites_rc,
                     "kyb_article_imposition": self.kyb_article_imposition,
                     "kyb_nis": self.kyb_nis,
-                    "is_company": self.is_company,
+                    "is_company": False if is_pp else (True if is_pm else self.is_company),
                     "street": self.street,
                     "street2": self.street2,
                     "city": self.city,
@@ -2755,12 +2809,10 @@ class ResPartner(models.Model):
         rc_official = data.get("rc_number_official") or data.get("rcNumberOfficial") or candidate_ctx.get("rc_official") or ""
         rc_raw = data.get("rc_number") or data.get("rcNumber") or data.get("rc") or candidate_ctx.get("rc_number") or ""
         date_crea_val = _normalize_algerian_date(data.get("date_creation") or data.get("date_immatriculation") or data.get("dateImmatriculation") or data.get("dateCreation"))
-        if not date_crea_val:
-            date_crea_val = _deduce_algerian_creation_date(nif=nif_candidate, rc=rc_official or rc_raw or candidate_ctx.get("rc_official") or candidate_ctx.get("rc_number"))
-        fallback_y = date_crea_val or (nif_candidate[2:4] if nif_candidate and len(nif_candidate) in (15, 20) and nif_candidate.isdigit() else None)
+        # Year hint is used ONLY to format the RC suffix; it is never stored as a creation date.
+        year_hint = date_crea_val or _deduce_algerian_creation_date(nif=nif_candidate, rc=rc_official or rc_raw or candidate_ctx.get("rc_official") or candidate_ctx.get("rc_number"))
+        fallback_y = year_hint or (nif_candidate[2:4] if nif_candidate and len(nif_candidate) in (15, 20) and nif_candidate.isdigit() else None)
         rc_val = format_official_rc(rc_official or rc_raw, fallback_y, addr_parsed["wilaya_code"]) or rc_official or rc_raw
-        if not date_crea_val and rc_val:
-            date_crea_val = _deduce_algerian_creation_date(rc=rc_val)
         forme_val = data.get("forme_juridique") or data.get("formeJuridique") or ""
 
         is_pm = False
@@ -2852,14 +2904,11 @@ class ResPartner(models.Model):
             "is_company", "company_type", "kyb_forme_juridique", "kyb_capital_social",
             "kyb_representant_legal", "company_registry", "kyb_date_creation", "kyb_date_radiation"
         }
-        # In Odoo 14.0, 15.0, 16.0: web client accepts standard ISO strings (YYYY-MM-DD) for Date fields.
-        # In Odoo 17+: OWL 2 uses Luxon DateTime for Date fields, so raw strings crash serializeDate().
-        try:
-            import odoo.release
-            is_legacy_web = getattr(odoo.release, "version_info", (14,))[0] < 17
-        except Exception:
-            is_legacy_web = False
-        _AUTOCOMPLETE_DATE_EXCLUDE = set() if is_legacy_web else {"kyb_date_creation", "kyb_date_radiation"}
+        # In Odoo 16+: web client uses Luxon DateTime for Date fields, so raw strings crash serializeDate()
+        # with TypeError: value.toFormat is not a function.
+        # Date fields (kyb_date_creation, kyb_date_radiation) are excluded from the client autocomplete payload;
+        # they are safely backfilled server-side upon record create() / write() via _cache_get_resolved_entity.
+        _AUTOCOMPLETE_DATE_EXCLUDE = {"kyb_date_creation", "kyb_date_radiation"}
         return {
             k: v for k, v in enrich_dict.items()
             if k not in _AUTOCOMPLETE_DATE_EXCLUDE

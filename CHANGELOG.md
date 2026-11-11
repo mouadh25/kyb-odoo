@@ -20,10 +20,28 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
 | **Odoo 18.0** (Community & Enterprise) | `18.0.2.0.9` | Active Production Standard | **🟢 Locked & Certified** |
 | **Odoo 17.0** (Community & Enterprise) | `17.0.2.0.9` | Primary Enterprise Adoption (Algeria) | **🟢 Locked & Certified** |
 | **Odoo 16.0** (Community & Enterprise) | `16.0.2.0.9` | Legacy LTS / SME Installed Base | **🟢 Locked & Certified** |
+| **Odoo 15.0** (Community & Enterprise) | `15.0.2.0.9` | Extended Legacy Enterprise Support | **🟢 Locked & Certified** |
+| **Odoo 14.0** (Community & Enterprise) | `14.0.2.0.9` | Mature LTS Legacy Deployment | **🟢 Locked & Certified** |
 
 ---
 
-## [2.0.9] - 2026-11-07
+## [2.0.9] - 2026-11-07 (Hardened 2026-11-09)
+
+### Security & Hardening (Enterprise Audit SEC-1..5)
+* **SEC-1 (Stored XSS Neutralization):**
+  * Applied `html_escape()` across all dynamic variables interpolated into Chatter cards (`res_partner.py`), vendor bill & customer invoice compliance alerts (`account_move.py`), and webhook alert messages (`main.py`). Malicious payloads (`<script>`, `<img onerror>`, `<b>` tags) are converted into harmless HTML entities before `Markup()` wrapping.
+* **SEC-2 (Timing-Safe Inbound Webhook Authentication):**
+  * Integrated constant-time `hmac.compare_digest` in `receive_webhook()` controller for both `Authorization: Bearer <token>` and HMAC-SHA256 `X-KYB-Signature` verification, eliminating timing attack vectors.
+* **SEC-3 (Access Rights & Privilege Escalation Protection):**
+  * Enforced internal user checks (`self.env.user.has_group('base.group_user')`) on `action_verify_kyb` and `enrich_company_message_post`, raising `AccessError` for portal or public users.
+* **SEC-4 (SSRF Defense & Protocol Whitelisting):**
+  * Validated URL schemes in `_get_kyb_client()`, restricting `kyb.base_url` to `http` and `https` and automatically resetting invalid protocols (`file://`, `gopher://`, `ftp://`) to the sovereign gateway URL.
+* **SEC-5 (Graceful Autocomplete Degradation):**
+  * Enclosed `autocomplete_by_name()` and `autocomplete_by_vat()` with defensive exception containment returning `[]` upon network interruptions without freezing user input.
+* **Algerian Territorial & Fiscal Precision:**
+  * Added `ALGERIAN_WILAYAS_ARABIC` dictionary covering 58/69 Wilayas in Arabic script (`قسنطينة`, `الجزائر`, `سطيف`, `وهران`, `البليدة`).
+  * Added Pre-2022 single-0 NIF extraction (e.g. NAFTAL `099916000969164` -> Wilaya `16` Alger / Cheraga).
+  * Date overwrite protection preventing certified creation/radiation dates from being wiped by partial updates.
 
 ### Added
 * **Décret Exécutif n° 05-468 (Art. 3) Personne Physique Statutory Identity Engine:**
@@ -31,8 +49,17 @@ When deployed into an Odoo instance, the universal semantic version maps to the 
   * Standardizes individual merchant governance fields: `kyb_representant_legal = NOM PRÉNOM (Titulaire)`, `kyb_forme_juridique = Personne Physique`, `kyb_capital_social = N/A (Patrimoine Individuel)`, and `is_company = False` (`company_type = person`).
 * **Automatic NIF-to-CNRC Category A Enrichment Cascade:**
   * Resolving a natural person by their 15/20-digit NIF (`185250600194154`) when `kyb_rc` is empty automatically triggers a live Category A registry discovery and enriches the official Trade Register (`11/00-0365048A11`) and NAE activity nomenclature.
+* **Full Multi-Version Support Across Odoo 14.0 & 15.0 LTS Foundations:**
+  * Backported partner autocomplete and fiscal verification engines to legacy Odoo 14.0 (QWeb `<t t-extend="partner_autocomplete.dropdown">`, `kyb_assets.xml`) and Odoo 15.0 (`web.assets_qweb`, `web.assets_backend`).
+  * Dedicated qualification testbeds live and certified behind sovereign HTTPS endpoints: `https://odoo14.digidevagency.dz` and `https://odoo15.digidevagency.dz`.
 
 ### Fixed
+* **Odoo 14 `company_registry` Attribute Defensive Resolution:**
+  * Protected `company_registry` access via `getattr(rec, "company_registry", "")` to eliminate `AttributeError` when saving partner records on Odoo 14 installations where `company_registry` is not defined on `res.partner`.
+* **Legacy Runtimes Dynamic Versioning & Default Loader (`res_config_settings`):**
+  * Implemented defensive `default_get` and `set_values` in `res_config_settings.py` to correctly resolve `kyb_installed_version` via manifest lookup and `odoo.release`, preventing false "update available" notices on legacy Odoo 14/15/16 instances.
+* **Non-Fabricated Algerian Immatriculation Year Resolution:**
+  * Updated `_deduce_algerian_creation_date` to return a clean 4-digit year string (`YYYY`) derived from NIF/RC instead of fabricating an artificial `YYYY-01-01` date.
 * **Single-Card In-Place Update & OWL Chatter Bus Synchronization (Zero Double Cards):**
   * Updated `_post_kyb_audit_log()` to modify `existing_cards[0]` in-place (`existing_cards[0].write(update_vals)`), unlink any extra legacy cards (`existing_cards[1:].unlink()`), and explicitly broadcast the updated `body` to the active user's OWL `Store` over `bus.bus`. Preserves a single `mail.message` ID (`same_card_id_in_place = True`), eliminating double cards in both PostgreSQL and the browser OWL Chatter across all creation, autocomplete, and re-verification workflows.
 * **Cross-Version `_message_track` & Deferred Precommit Tracking Suppression (Odoo 16.0 – 20.0):**

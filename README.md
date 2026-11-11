@@ -1,6 +1,6 @@
 ﻿# KYB Odoo Connector â€” Algerian Corporate Identity & Temporal Tax Compliance
 
-[![Odoo Version](https://img.shields.io/badge/Odoo-16.0%20|%2017.0%20|%2018.0%20|%2019.0%20|%2020.0-18181b.svg)](https://apps.odoo.com)
+[![Odoo Version](https://img.shields.io/badge/Odoo-14.0%20|%2015.0%20|%2016.0%20|%2017.0%20|%2018.0%20|%2019.0%20|%2020.0-18181b.svg)](https://apps.odoo.com)
 [![License: LGPL-3](https://img.shields.io/badge/License-LGPL--3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Sovereign Cloud](https://img.shields.io/badge/Residency-AlgÃ©rie%20TÃ©lÃ©com%20Datacenter-10b981.svg)](https://kyb.digidevagency.dz)
 [![Law Compliance](https://img.shields.io/badge/Compliance-Loi%2018--07%20/%2025--11-06b6d4.svg)](https://kyb.digidevagency.dz)
@@ -155,6 +155,8 @@ For detailed release history, new features, bug fixes, and upgrade notes across 
 | **Odoo 18.0** | `18.0.2.0.9` | Active Production Standard | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
 | **Odoo 17.0** | `17.0.2.0.9` | Primary Enterprise Adoption (Algeria) | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
 | **Odoo 16.0** | `16.0.2.0.9` | Legacy LTS / SME Installed Base | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 15.0** | `15.0.2.0.9` | Extended Legacy Enterprise Support | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
+| **Odoo 14.0** | `14.0.2.0.9` | Mature LTS Legacy Deployment | FR / AR / EN | **ðŸŸ¢ Locked & Certified** |
 
 ---
 
@@ -167,6 +169,16 @@ Authoritative documentation and integration guides for the KYB ecosystem:
 * **ERP Integrator & Administrator Manual:** [doc/INTEGRATOR_MANUAL.md](doc/INTEGRATOR_MANUAL.md)
 * **User Manual (PDF):** [doc/USER_MANUAL.pdf](doc/USER_MANUAL.pdf)
 * **Release Changelog:** [CHANGELOG.md](CHANGELOG.md)
+
+### Live Multi-Version Sovereign Qualification Testbeds
+Integrators can verify KYB behavior across all supported Odoo generations hosted at AlgÃ©rie TÃ©lÃ©com Cloud:
+* **Odoo 20.0:** [https://odoo20.digidevagency.dz](https://odoo20.digidevagency.dz)
+* **Odoo 19.0:** [https://odoo19.digidevagency.dz](https://odoo19.digidevagency.dz)
+* **Odoo 18.0:** [https://odoo18.digidevagency.dz](https://odoo18.digidevagency.dz)
+* **Odoo 17.0:** [https://odoo17.digidevagency.dz](https://odoo17.digidevagency.dz)
+* **Odoo 16.0:** [https://odoo16.digidevagency.dz](https://odoo16.digidevagency.dz)
+* **Odoo 15.0:** [https://odoo15.digidevagency.dz](https://odoo15.digidevagency.dz)
+* **Odoo 14.0:** [https://odoo14.digidevagency.dz](https://odoo14.digidevagency.dz)
 
 ---
 

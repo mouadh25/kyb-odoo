@@ -179,7 +179,7 @@ class ResConfigSettings(models.TransientModel):
         string="Notes de Version",
         config_parameter="kyb.changelog",
     )
-    kyb_last_telemetry_sync = fields.Datetime(
+    kyb_last_telemetry_sync = fields.Char(
         string="Dernière Vérification",
         config_parameter="kyb.last_telemetry_sync",
     )
@@ -200,6 +200,53 @@ class ResConfigSettings(models.TransientModel):
         help="Applique automatiquement les correctifs de sécurité et de conformité mineurs lors de la vérification planifiée.",
     )
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super(ResConfigSettings, self).default_get(fields_list)
+        mod = self.env["ir.module.module"].sudo().search([("name", "=", "kyb_odoo")], limit=1)
+        inst = (mod.installed_version or mod.latest_version) if mod else False
+        if not inst:
+            try:
+                import odoo.modules.module as odoo_module
+                manifest = odoo_module.load_manifest("kyb_odoo")
+                inst = manifest.get("version")
+            except Exception:
+                inst = False
+        if not inst:
+            try:
+                from odoo import release
+                s = getattr(release, "serie", None) or getattr(release, "major_version", "14.0")
+                inst = f"{s}.2.0.9"
+            except Exception:
+                inst = "14.0.2.0.9"
+
+        res["kyb_installed_version"] = inst
+        latest = res.get("kyb_latest_version")
+        import re
+        inst_clean = re.sub(r'^\d+\.0\.', '', str(inst or '')).strip()
+        latest_clean = re.sub(r'^\d+\.0\.', '', str(latest or '')).strip()
+        try:
+            i_tuple = tuple(int(x) for x in inst_clean.split('.') if x.isdigit())
+            l_tuple = tuple(int(x) for x in latest_clean.split('.') if x.isdigit())
+            if not l_tuple or l_tuple <= i_tuple:
+                res["kyb_latest_version"] = inst
+            elif latest and inst and not latest.startswith(inst.split(".")[0] + "."):
+                series_prefix = inst.split(".")[0] + ".0."
+                res["kyb_latest_version"] = f"{series_prefix}{latest.lstrip('v')}"
+        except Exception:
+            res["kyb_latest_version"] = inst
+
+        if res.get("kyb_last_telemetry_sync") and not isinstance(res["kyb_last_telemetry_sync"], str):
+            res["kyb_last_telemetry_sync"] = fields.Datetime.to_string(res["kyb_last_telemetry_sync"])
+
+        return res
+
+    def set_values(self):
+        for rec in self:
+            if hasattr(rec, "kyb_last_telemetry_sync") and rec.kyb_last_telemetry_sync and not isinstance(rec.kyb_last_telemetry_sync, str):
+                rec.kyb_last_telemetry_sync = fields.Datetime.to_string(rec.kyb_last_telemetry_sync)
+        super(ResConfigSettings, self).set_values()
+
     @api.onchange("kyb_update_policy")
     def _onchange_kyb_update_policy(self):
         self.kyb_auto_update_patches = bool(self.kyb_update_policy == "auto")
@@ -208,7 +255,22 @@ class ResConfigSettings(models.TransientModel):
         import re
         for rec in self:
             mod = self.env["ir.module.module"].sudo().search([("name", "=", "kyb_odoo")], limit=1)
-            inst = mod.installed_version if mod and mod.installed_version else "2.0.4"
+            inst = (mod.installed_version or mod.latest_version) if mod else False
+            if not inst:
+                try:
+                    import odoo.modules.module as odoo_module
+                    manifest = odoo_module.load_manifest("kyb_odoo")
+                    inst = manifest.get("version")
+                except Exception:
+                    inst = False
+            if not inst:
+                try:
+                    from odoo import release
+                    s = getattr(release, "serie", None) or getattr(release, "major_version", "14.0")
+                    inst = f"{s}.2.0.9"
+                except Exception:
+                    inst = "14.0.2.0.9"
+
             rec.kyb_installed_version = inst
             latest = rec.kyb_latest_version or inst
             inst_clean = re.sub(r'^\d+\.0\.', '', str(inst)).strip()
@@ -387,12 +449,21 @@ class ResConfigSettings(models.TransientModel):
                 except Exception:
                     really_has_update = False
 
-                _set_config_param(self.env, "kyb.latest_version", latest)
+                series_prefix = str(telemetry_data["odoo_version"]).split(".")[0] + ".0."
+                full_latest = f"{series_prefix}{latest}" if not latest.startswith(series_prefix) else latest
+                reported_latest = full_latest if really_has_update else telemetry_data["connector_version"]
+                _set_config_param(self.env, "kyb.latest_version", reported_latest)
                 _set_config_param(self.env, "kyb.update_available", str(really_has_update).lower())
                 _set_config_param(self.env, "kyb.force_upgrade", str(force_upgrade).lower())
                 if changelog:
                     _set_config_param(self.env, "kyb.changelog", changelog)
-                _set_config_param(self.env, "kyb.last_telemetry_sync", fields.Datetime.now())
+                _set_config_param(self.env, "kyb.last_telemetry_sync", fields.Datetime.to_string(fields.Datetime.now()))
+                try:
+                    self.kyb_installed_version = telemetry_data["connector_version"]
+                    self.kyb_latest_version = reported_latest
+                    self.kyb_last_telemetry_sync = fields.Datetime.to_string(fields.Datetime.now())
+                except Exception:
+                    pass
 
                 if really_has_update:
                     msg = _("Nouvelle version %s disponible ! Cliquez sur 'Mettre à jour maintenant'.") % latest

@@ -36,7 +36,6 @@ msgid "Configuration"
 msgstr "Configuration"
 
 #. module: kyb_odoo
-#: model:ir.ui.menu,name:kyb_odoo.menu_kyb_settings
 #: model:ir.ui.menu,name:kyb_odoo.menu_kyb_invoicing_config
 #: model:ir.ui.menu,name:kyb_odoo.menu_kyb_contacts_config
 #: model:ir.actions.act_window,name:kyb_odoo.action_kyb_configuration
@@ -235,6 +234,8 @@ msgstr "Unverified"
 
 #. module: kyb_odoo
 #: model:ir.model.fields,field_description:kyb_odoo.field_account_move__kyb_compliance_message
+#: code:addons/kyb_odoo/models/account_move.py:0
+#, python-format
 msgid "Audit Temporel KYB"
 msgstr "KYB Temporal Audit"
 
@@ -279,12 +280,6 @@ msgstr "Unable to verify entity '%(query)s': %(error)s"
 #, python-format
 msgid "Veuillez sélectionner un partenaire avant de vérifier la conformité fiscale."
 msgstr "Please select a partner before auditing fiscal compliance."
-
-#. module: kyb_odoo
-#: code:addons/kyb_odoo/models/account_move.py:0
-#, python-format
-msgid "Audit Temporel KYB"
-msgstr "KYB Temporal Audit"
 
 #. module: kyb_odoo
 #: code:addons/kyb_odoo/models/account_move.py:0
